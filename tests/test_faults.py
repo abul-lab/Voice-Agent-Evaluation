@@ -156,9 +156,9 @@ def test_a_crashing_scenario_is_recorded_as_an_error_with_its_traceback(ctx, mon
     import logging
 
     from voiceshop.catalog import multiagent
-    from voiceshop.catalog.storerun import load_store_scenarios, run_store_scenario
     from voiceshop.catalog.model import Catalog
     from voiceshop.catalog.shop import ShopSessions
+    from voiceshop.catalog.storerun import load_store_scenarios, run_store_scenario
 
     catalog = Catalog.load(DATA)
     store = StoreData(DATA)

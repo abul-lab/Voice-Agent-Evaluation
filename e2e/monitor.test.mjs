@@ -118,3 +118,16 @@ test('a smoke run starts from the page and its row appears', async () => {
   assert.deepEqual(p.errors, [], 'no uncaught page errors during the run');
   await p.close();
 });
+
+test('a finished run shows the time spent on each step', async () => {
+  const p = await page();
+  await p.goto(`${base}/`);
+  // Wait for a finished run: a run still in progress has no stored turns to summarise yet.
+  const finished = p.locator('#runs-body tr', { hasText: 'Passed' }).first();
+  await finished.waitFor({ timeout: 60000 });
+  await finished.click();
+  await p.waitForFunction(() => document.querySelector('#metrics')?.textContent.includes('Route time'),
+    null, { timeout: 10000 });
+  assert.deepEqual(p.errors, [], 'no uncaught page errors');
+  await p.close();
+});

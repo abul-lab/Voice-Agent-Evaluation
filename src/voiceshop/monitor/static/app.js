@@ -436,6 +436,32 @@
   }
 
   // -------------------------------------------------------- outcome + stream
+  // Time spent on each step of the replies in this run: 50th and 95th percentile, in milliseconds.
+  function renderStepTimes(turns) {
+    const samples = {};
+    for (const t of turns) {
+      const steps = stagesOf(t);
+      if (!steps) continue;
+      for (const [name, ms] of Object.entries(steps)) {
+        if (typeof ms === "number") (samples[name] ||= []).push(ms);
+      }
+    }
+    const pct = (values, p) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const k = (sorted.length - 1) * p / 100;
+      const lo = Math.floor(k), hi = Math.min(lo + 1, sorted.length - 1);
+      return sorted[lo] + (sorted[hi] - sorted[lo]) * (k - lo);
+    };
+    const dl = $("metrics");
+    const names = { understand_ms: "Understand", route_ms: "Route", dispatch_ms: "Dispatch" };
+    for (const key of Object.keys(names)) {
+      const values = samples[key];
+      if (!values || !values.length) continue;
+      dl.appendChild(el("dt", null, `${names[key]} time`));
+      dl.appendChild(el("dd", null, `p50 ${pct(values, 50).toFixed(1)} ms · p95 ${pct(values, 95).toFixed(1)} ms`));
+    }
+  }
+
   function renderOutcome(run) {
     const badge = $("result-badge");
     badge.textContent = humanStatus(run);
@@ -501,6 +527,7 @@
       const turns = await api(`/api/runs/${encodeURIComponent(id)}/turns`);
       if (epoch !== state.epoch) return undefined;
       state.turns = turns.items;
+      renderStepTimes(turns.items);
       $("play-run").disabled = !turns.items.length;
       if (!turns.items.length) return resetConversation("This run recorded no conversation.");
       $("conversation").replaceChildren();

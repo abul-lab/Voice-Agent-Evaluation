@@ -189,14 +189,70 @@ The storefront address is set on the Configuration page and saved to `monitor_se
 - **One server process, one operator.** There are no user accounts. Storefront sessions and runs are kept per server.
 - **Run from a checkout.** The store reads its data files from the repository, so an installed package on its own will not find them.
 
+## Running it for real
+
+**Check the configuration first.** It prints the effective settings (secrets only as set or not set) and every
+problem, and the server refuses to start while there are problems:
+
+```bash
+voiceshop check-config
+```
+
+**Named keys with roles.** The shared `VOICESHOP_API_KEY` still works, but each person should have their own key:
+
+```bash
+voiceshop keys create --name qe-lead --role admin      # shown once; only its hash is stored
+voiceshop keys create --name qe-analyst --role operator
+voiceshop keys list
+voiceshop keys revoke --name qe-analyst
+```
+
+| Role | Can |
+|---|---|
+| viewer | read everything the monitor shows |
+| operator | start and stop test suites |
+| admin | everything above, change settings, clear history |
+
+Every start, stop, settings change and history clear is recorded against the person who did it, with the request id.
+Changes are rate limited per person, and requests are rate limited per client address.
+
+**Retention.** Old run transcripts can be removed; the audit trail is kept:
+
+```bash
+voiceshop prune --older-than-days 90 --dry-run
+voiceshop prune --older-than-days 90
+```
+
+**Containers and TLS.** `Dockerfile`, `docker-compose.yml` and `deploy/Caddyfile` are included. The monitor listens
+on loopback behind a TLS proxy. Set `VOICESHOP_TRUST_PROXY=1` only when the proxy adds `X-Forwarded-For`.
+See `.env.example` for the variables. The container image has not been built in this repository's current
+environment; build it before relying on it.
+
+**Stopping.** On SIGTERM or Ctrl+C the server stops accepting requests, asks running suites to stop, and waits
+up to 30 seconds. Runs still marked running after a restart are recorded as interrupted.
+
+**Service levels and alerts:** `deploy/slo.md`. **Data handling:** `deploy/data-governance.md`.
+**API description:** `deploy/openapi.json` (checked against the live routes by the tests).
+
+## Quality of the code and the service
+
+| Check | Command | Status |
+|---|---|---|
+| Unit, integration, security and fault tests | `pytest -q --cov=voiceshop` | 80% line coverage; CI requires 75% |
+| Dependency vulnerabilities | `pip-audit --skip-editable` | no known vulnerabilities (CI) |
+| Browser end-to-end checks (rules router only) | `cd e2e && npm install && npx playwright install chromium && npm test` | six checks; CI job |
+| Load (storefront) | `python tools/loadtest.py --workers 20 --requests 50` | recorded in `deploy/load-results.md` |
+| Judge drift against the accepted reference | `voiceshop judge-drift --current <calibration.json>` | reference is the local model's current behaviour |
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`:
 
 1. lint (`ruff check src tests`)
-2. unit, integration and security tests (`pytest`)
+2. unit, integration and security tests with the coverage floor, then the dependency audit
 3. the smoke, targeted and full regression tiers (`voiceshop eval`)
 4. the regression gate against the saved baseline (`voiceshop regress`)
+5. a separate job for the browser end-to-end checks
 
 Reports are uploaded as build artifacts.
 

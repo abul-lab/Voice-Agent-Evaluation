@@ -63,6 +63,18 @@ class Metrics:
         self.runs_started = 0
         self.active_runs = 0
         self.runs_rejected = 0
+        # Quality of the last finished suite (None until a suite has finished in this process).
+        self.last_gate_passed: bool | None = None
+        self.last_reply_p95_ms: float | None = None
+        self.last_attack_success_rate: float | None = None
+        self.last_pass_rate: float | None = None
+
+    def record_suite(self, summary: dict) -> None:
+        with self._lock:
+            self.last_gate_passed = bool(summary.get("gate_passed"))
+            self.last_reply_p95_ms = summary.get("latency_gate", {}).get("p95_ms")
+            self.last_attack_success_rate = summary.get("security", {}).get("attack_success_rate")
+            self.last_pass_rate = summary.get("pass_rate")
 
     def http_request(self, route: str, code: int) -> None:
         with self._lock:
@@ -87,6 +99,24 @@ class Metrics:
                 "# TYPE voiceshop_active_runs gauge",
                 f"voiceshop_active_runs {self.active_runs}",
             ]
+            if self.last_gate_passed is not None:
+                lines += [
+                    "# HELP voiceshop_last_suite_gate_passed 1 when the last finished suite passed its release gate.",
+                    "# TYPE voiceshop_last_suite_gate_passed gauge",
+                    f"voiceshop_last_suite_gate_passed {1 if self.last_gate_passed else 0}",
+                    "# HELP voiceshop_last_suite_pass_rate Share of cases that passed in the last finished suite.",
+                    "# TYPE voiceshop_last_suite_pass_rate gauge",
+                    f"voiceshop_last_suite_pass_rate {self.last_pass_rate}",
+                    "# HELP voiceshop_last_suite_attack_success_rate Share of red-team attacks that succeeded.",
+                    "# TYPE voiceshop_last_suite_attack_success_rate gauge",
+                    f"voiceshop_last_suite_attack_success_rate {self.last_attack_success_rate}",
+                ]
+                if self.last_reply_p95_ms is not None:
+                    lines += [
+                        "# HELP voiceshop_last_suite_reply_p95_ms 95th percentile of agent reply time, last suite.",
+                        "# TYPE voiceshop_last_suite_reply_p95_ms gauge",
+                        f"voiceshop_last_suite_reply_p95_ms {self.last_reply_p95_ms}",
+                    ]
             for status, n in sorted(counts.items()):
                 if status == "turns":
                     continue
@@ -173,10 +203,12 @@ class MonitorApp:
         def job() -> None:
             self.metrics.active_runs += 1
             try:
-                run_store_suite(self.ctx, bundle["catalog"], bundle["store"], bundle["scenarios"],
+                report = run_store_suite(self.ctx, bundle["catalog"], bundle["store"], bundle["scenarios"],
                                 threshold=PASS_THRESHOLD, batch_id=batch_id,
                                 tags=tag_map[test_type], on_turn=pace, stop_event=stop,
                                 shops=bundle["shops"], source=actor)
+                if not stop.is_set():  # a stopped suite is incomplete: it must not change the quality measures
+                    self.metrics.record_suite(report["summary"])
             except Exception:
                 log.exception("store suite crashed", extra={"batch_id": batch_id})
             finally:

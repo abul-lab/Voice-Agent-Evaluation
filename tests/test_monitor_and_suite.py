@@ -400,3 +400,24 @@ def test_a_suite_start_is_audited_with_the_request_id_that_started_it(ctx, tmp_p
         server.shutdown()
         server.server_close()
         app.close()
+
+
+def test_the_last_suite_quality_is_on_the_metrics_endpoint(ctx, tmp_path):
+    import time as _t
+
+    app = MonitorApp(ctx, api_key=KEY, max_concurrent_runs=2, max_body_bytes=4096, store_bundle=_bundle())
+    base, server = _serve(app)
+    try:
+        assert b"voiceshop_last_suite_gate_passed" not in _get(base + "/metrics")[1]  # nothing has finished yet
+        app.try_acquire()
+        app.submit_store_suite("smoke", pace_ms=0)
+        deadline = _t.monotonic() + 30
+        while app.metrics.last_gate_passed is None and _t.monotonic() < deadline:
+            _t.sleep(0.05)
+        text = _get(base + "/metrics")[1].decode()
+        assert "voiceshop_last_suite_gate_passed 1" in text
+        assert "voiceshop_last_suite_attack_success_rate" in text and "voiceshop_last_suite_reply_p95_ms" in text
+    finally:
+        server.shutdown()
+        server.server_close()
+        app.close()

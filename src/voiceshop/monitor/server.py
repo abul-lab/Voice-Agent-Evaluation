@@ -31,6 +31,7 @@ from voiceshop import __version__
 from voiceshop.context import RuntimeContext
 from voiceshop.errors import VoiceShopError
 from voiceshop.monitor.auth import KeyRing, Principal
+from voiceshop.monitor.ratelimit import TokenBucket
 from voiceshop.storage.db import SCHEMA_VERSION
 
 PASS_THRESHOLD = 0.9  # share of fully passing cases needed for the gate
@@ -153,8 +154,12 @@ class MonitorApp:
         local_ui_no_key: bool = False,
         store_bundle: dict[str, Any] | None = None,
         settings_path: Path | None = None,
+        changes_per_minute: int = 30,
+        attempts_per_minute: int = 60,
     ) -> None:
         self.ctx = ctx
+        self.limit_changes = TokenBucket(changes_per_minute)  # per person, for changes
+        self.limit_attempts = TokenBucket(attempts_per_minute)  # per client address, for every mutating try
         # Monitor settings (the storefront URL). None means "this monitor's own /shop page".
         self.settings_path = settings_path
         self.storefront_url: str | None = _load_settings(settings_path)
@@ -412,6 +417,9 @@ class _Handler(BaseHTTPRequestHandler):
     # --------------------------------------------------------------- helpers
     def _authorise(self, role: str, route: str) -> Principal | None:
         """Who is calling, and whether their role allows this route. Sends the error itself and returns None."""
+        if not self.app.limit_attempts.allow(self.client_address[0]):
+            self._error(429, "rate_limited", "too many requests from this address; slow down", route)
+            return None
         if self._local_ui_allowed():
             return Principal("local-ui", "admin")  # the explicit loopback-only exception
         if self.app.keys.is_empty:
@@ -423,6 +431,9 @@ class _Handler(BaseHTTPRequestHandler):
             return None
         if not principal.allows(role):
             self._error(403, "forbidden", f"this action needs the {role} role", route)
+            return None
+        if not self.app.limit_changes.allow(principal.name):
+            self._error(429, "rate_limited", f"too many changes by {principal.name}; slow down", route)
             return None
         return principal
 

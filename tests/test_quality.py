@@ -255,3 +255,13 @@ def test_a_judge_result_with_failed_calls_is_not_written_unless_partial_is_allow
     with pytest.raises(JudgeError) as err:
         assert_complete({"failures": 2, "items": 36})
     assert "nothing was written" in str(err.value)
+
+
+def test_the_token_bucket_allows_a_burst_then_refuses_until_refilled():
+    from voiceshop.monitor.ratelimit import TokenBucket
+
+    bucket = TokenBucket(per_minute=2)
+    assert bucket.allow("alice", now=0.0) and bucket.allow("alice", now=0.0)
+    assert bucket.allow("alice", now=0.0) is False  # burst used up
+    assert bucket.allow("bob", now=0.0)  # other callers are not affected
+    assert bucket.allow("alice", now=31.0)  # half a minute later one more request is allowed

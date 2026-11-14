@@ -318,3 +318,18 @@ def test_damaged_key_files_are_refused(tmp_path):
         KeyRing([{"name": "x", "role": "root", "sha256": "0" * 64}])  # unknown role
     with pytest.raises(KeyFileError):
         KeyRing([{"name": "x", "role": "admin", "sha256": "not-a-hash"}])
+
+
+def test_changes_are_rate_limited_per_person(ctx, tmp_path):
+    ring, keys = _ring(tmp_path)
+    app = MonitorApp(ctx, keys=ring, max_concurrent_runs=1, max_body_bytes=4096, store_bundle=_bundle(),
+                     settings_path=tmp_path / "monitor_settings.json", changes_per_minute=1)
+    base, server = _serve(app)
+    try:
+        first, _ = _post(base + "/api/settings", {"storefront_url": "http://127.0.0.1:9/shop"}, key=keys["lead"])
+        second, body = _post(base + "/api/settings", {"storefront_url": "http://127.0.0.1:9/shop"}, key=keys["lead"])
+        assert first == 200 and second == 429 and body["error"]["code"] == "rate_limited"
+    finally:
+        server.shutdown()
+        server.server_close()
+        app.close()

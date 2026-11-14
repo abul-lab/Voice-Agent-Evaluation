@@ -156,3 +156,17 @@ def test_concurrent_approvals_for_one_order_produce_exactly_one(store, ctx):
     for t in threads:
         t.join()
     assert results.count(False) == 1 and results.count(True) == 7
+
+
+def test_the_audit_trail_cannot_be_changed_or_deleted_even_by_direct_sql(ctx):
+    import sqlite3
+
+    audit = AuditLog(ctx.db_path)
+    audit.record("t-audit", "refund", "refund.approved", "NW-1001")
+    conn = sqlite3.connect(ctx.db_path)
+    with pytest.raises(sqlite3.DatabaseError, match="append-only"):
+        conn.execute("UPDATE audit_events SET action='nothing happened' WHERE tenant_id='t-audit'")
+    with pytest.raises(sqlite3.DatabaseError, match="append-only"):
+        conn.execute("DELETE FROM audit_events WHERE tenant_id='t-audit'")
+    conn.close()
+    assert audit.list("t-audit")[0]["action"] == "refund.approved"

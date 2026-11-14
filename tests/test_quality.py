@@ -219,7 +219,9 @@ def test_an_existing_version_1_database_is_upgraded_in_place(tmp_path):
     path = tmp_path / "old.db"
     conn = sqlite3.connect(path)
     conn.executescript(
-        """CREATE TABLE runs (id TEXT PRIMARY KEY, batch_id TEXT, scenario_id TEXT NOT NULL, mode TEXT NOT NULL,
+        """CREATE TABLE audit_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, tenant_id TEXT NOT NULL,
+             actor TEXT NOT NULL, action TEXT NOT NULL, entity_id TEXT, detail TEXT NOT NULL DEFAULT '{}');
+           CREATE TABLE runs (id TEXT PRIMARY KEY, batch_id TEXT, scenario_id TEXT NOT NULL, mode TEXT NOT NULL,
              source TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, finished_at TEXT,
              summary TEXT NOT NULL DEFAULT '{}');
            CREATE TABLE turns (run_id TEXT NOT NULL REFERENCES runs (id) ON DELETE CASCADE, seq INTEGER NOT NULL,

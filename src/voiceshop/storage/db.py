@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _MIGRATIONS: dict[int, list[str]] = {
     1: [
@@ -89,6 +89,18 @@ _MIGRATIONS: dict[int, list[str]] = {
         )
         """,
         "CREATE INDEX IF NOT EXISTS ix_shop_sessions_updated ON shop_sessions (updated_at)",
+    ],
+    5: [
+        # The audit trail is a record of what happened. The database refuses to change or remove it,
+        # whatever code path tries.
+        """
+        CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_events
+        BEGIN SELECT RAISE(ABORT, 'audit trail is append-only'); END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_events
+        BEGIN SELECT RAISE(ABORT, 'audit trail is append-only'); END
+        """,
     ],
 }
 

@@ -45,3 +45,10 @@ def _save_settings(path: Path, url: str | None) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps({"storefront_url": url}, indent=2), encoding="utf-8")
     os.replace(tmp, path)
+
+
+def _store_scopes() -> dict[str, frozenset[str]]:
+    """Each specialist's granted scopes, read from the store module so the UI shows the real permissions."""
+    from voiceshop.catalog.store import SCOPES
+
+    return SCOPES

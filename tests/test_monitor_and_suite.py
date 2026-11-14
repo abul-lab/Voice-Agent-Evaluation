@@ -197,7 +197,7 @@ def test_settings_default_then_save_and_validate(live):
 
 
 def test_settings_survive_a_restart(tmp_path):
-    from voiceshop.monitor.server import _load_settings, _save_settings
+    from voiceshop.monitor.settings import _load_settings, _save_settings
 
     path = tmp_path / "monitor_settings.json"
     assert _load_settings(path) is None  # no file: default

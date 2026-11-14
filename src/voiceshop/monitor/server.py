@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import sqlite3
 import threading
 import time as _time
 import uuid
@@ -30,12 +29,13 @@ from urllib.parse import parse_qs, urlparse
 from voiceshop import __version__
 from voiceshop.context import RuntimeContext
 from voiceshop.errors import VoiceShopError
+from voiceshop.monitor.admin import AdminRoutes
 from voiceshop.monitor.auth import KeyRing, Principal
 from voiceshop.monitor.ratelimit import TokenBucket
+from voiceshop.monitor.runs import RunRoutes
 from voiceshop.monitor.security import SECURITY_HEADERS
-from voiceshop.monitor.settings import AGENT_NAMES, _load_settings, _save_settings, _valid_storefront_url
+from voiceshop.monitor.settings import _load_settings, _store_scopes
 from voiceshop.monitor.storefront import ShopRoutes
-from voiceshop.storage.db import SCHEMA_VERSION
 
 PASS_THRESHOLD = 0.9  # share of fully passing cases needed for the gate
 
@@ -46,12 +46,6 @@ _SID = re.compile(r"[A-Za-z0-9._-]{1,120}\Z")  # \Z: no trailing newline allowed
 _PAGE = re.compile(r"(home|cart|checkout|category:[a-z_]{1,40}|product:[a-z0-9-]{1,40})\Z")
 _RUN_ID = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 
-
-def _store_scopes() -> dict[str, frozenset[str]]:
-    """Each specialist's granted scopes, read from the store module so the UI shows the real permissions."""
-    from voiceshop.catalog.store import SCOPES
-
-    return SCOPES
 
 
 class Metrics:
@@ -233,7 +227,7 @@ class MonitorApp:
         self._pool.shutdown(wait=False, cancel_futures=True)
 
 
-class _Handler(ShopRoutes, BaseHTTPRequestHandler):
+class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
     server_version = f"voiceshop/{__version__}"
     protocol_version = "HTTP/1.1"
     app: MonitorApp  # injected by factory
@@ -455,136 +449,9 @@ class _Handler(ShopRoutes, BaseHTTPRequestHandler):
         return origin is None or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
 
     # ----------------------------------------------------------- storefront
-    def _settings_view(self) -> dict[str, Any]:
-        scopes = _store_scopes()
-        return {
-            "storefront_url": self.app.storefront_url,
-            "default_storefront": "this monitor's /shop page",
-            "voice_agents": [
-                {"id": aid, "name": name, "scopes": sorted(scopes.get(aid, ()))}
-                for aid, name in AGENT_NAMES.items()
-            ],
-        }
-
-    def _settings_save(self) -> None:
-        principal = self._authorise("admin", "/api/settings")
-        if principal is None:
-            return
-        try:
-            body = self._read_json() or {}
-            url = _valid_storefront_url(body.get("storefront_url"))
-        except (ValueError, json.JSONDecodeError) as exc:
-            return self._error(400, "bad_request", str(exc), "/api/settings")
-        if self.app.metrics.active_runs > 0:
-            return self._error(409, "busy", "a test is running; stop it before changing the storefront address",
-                               "/api/settings")
-        self.app.storefront_url = url
-        if self.app.settings_path is not None:
-            _save_settings(self.app.settings_path, url)
-        self.app.ctx.audit.record("monitor", principal.name, "settings.changed", None, storefront_url=url)
-        return self._json(200, self._settings_view(), "/api/settings")
-
-    def _history_clear(self) -> None:
-        principal = self._authorise("admin", "/api/history/clear")
-        if principal is None:
-            return
-        if self.app.metrics.active_runs > 0:  # only work that is really executing in this process blocks a clear
-            return self._error(409, "busy", "a test is still running; stop it before clearing history",
-                               "/api/history/clear")
-        removed = self.app.ctx.runs.clear()
-        self.app.ctx.audit.record("monitor", principal.name, "history.cleared", None, removed=removed)
-        return self._json(200, {"removed": removed}, "/api/history/clear")
-
-    def _store_items(self) -> list[dict[str, Any]]:
-        out = []
-        for sc in self._store()["scenarios"]:
-            exp = sc.expect
-            if exp.get("order"):
-                outcome = f"Order placed for ${exp['order']['total']}"
-            elif exp.get("no_order"):
-                outcome = "No order placed"
-            elif exp.get("refund"):
-                outcome = f"Refund {exp['refund']['decision']}"
-            elif exp.get("act"):
-                outcome = exp["act"].replace("_", " ")
-            else:
-                outcome = "Question answered"
-            out.append({
-                "id": sc.id, "language": "en", "tags": list(sc.tags), "description": sc.description,
-                "intent": sc.goals[0].intent, "expected_outcome": outcome,
-                "max_turns": exp.get("max_turns", sc.max_turns),
-                "test_types": ["regression"] + [t for t in ("smoke", "targeted") if t in sc.tags],
-            })
-        return out
-
     def _static(self, name: str, ctype: str, route: str, extra: dict | None = None) -> None:
         body = resources.files("voiceshop.monitor").joinpath("static", name).read_bytes()
         self._send(200, body, ctype, route, {"Cache-Control": "no-cache", **(extra or {})})
-
-    def _readyz(self) -> None:
-        try:
-            self.app.ctx.runs.counts()
-            ok, detail = True, {"schema_version": SCHEMA_VERSION}
-        except (sqlite3.Error, OSError) as exc:  # readiness reports a database problem instead of crashing
-            ok, detail = False, {"error": type(exc).__name__}
-        self._json(200 if ok else 503, {"status": "ready" if ok else "not_ready", **detail}, "/readyz")
-
-    def _run_resource(self, run_id: str, sub: str | None, query: dict) -> None:
-        if not _RUN_ID.match(run_id):
-            raise ValueError("invalid run id")
-        route = "/api/runs/{id}" + (sub or "")
-        run = self.app.ctx.runs.get(run_id)
-        if run is None:
-            return self._error(404, "not_found", "no such run", route)
-        if sub == "/turns":
-            after = int((query.get("after") or ["0"])[0])
-            return self._json(200, {"items": self.app.ctx.runs.turns(run_id, after)}, route)
-        if sub == "/stream":
-            return self._stream(run_id, route)
-        return self._json(200, run, route)
-
-    def _stream(self, run_id: str, route: str) -> None:
-        """SSE: replays existing turns, then pushes new ones until the run finishes (or 15 min)."""
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Accel-Buffering", "no")
-        self.send_header("X-Request-Id", self._request_id)
-        for k, v in SECURITY_HEADERS.items():
-            self.send_header(k, v)
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.close_connection = True
-        self.app.metrics.http_request(route, 200)
-        last = 0
-        last_audit = 0
-        deadline = _time.monotonic() + 15 * 60
-        last_beat = _time.monotonic()
-        try:
-            while _time.monotonic() < deadline:
-                for turn in self.app.ctx.runs.turns(run_id, last):
-                    last = turn["seq"]
-                    self._sse("turn", turn)
-                for entry in self.app.ctx.audit.since(run_id, last_audit):
-                    last_audit = entry["id"]
-                    self._sse("tool", entry)
-                run = self.app.ctx.runs.get(run_id)
-                if run and run["status"] != "running":
-                    self._sse("end", {"status": run["status"], "summary": run["summary"]})
-                    return
-                if _time.monotonic() - last_beat > 15:
-                    self.wfile.write(b": keep-alive\n\n")
-                    self.wfile.flush()
-                    last_beat = _time.monotonic()
-                _time.sleep(0.4)
-        except (BrokenPipeError, ConnectionResetError):
-            return
-
-    def _sse(self, event: str, data: Any) -> None:
-        payload = json.dumps(data, ensure_ascii=False, default=str)
-        self.wfile.write(f"event: {event}\ndata: {payload}\n\n".encode())
-        self.wfile.flush()
-
 
 def make_server(app: MonitorApp, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
     if app.local_ui_no_key and host not in ("127.0.0.1", "localhost", "::1"):

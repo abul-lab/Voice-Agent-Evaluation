@@ -13,7 +13,8 @@ from pathlib import Path
 @dataclass(frozen=True)
 class RuntimeSettings:
     db_path: Path
-    api_key: str | None  # None = mutating endpoints disabled (secure default)
+    api_key: str | None  # one shared admin key from the environment (optional; named keys are preferred)
+    keys_file: Path  # named API keys with roles (hashes only)
     log_level: str
     gemini_api_key: str | None
     gemini_model: str
@@ -27,6 +28,7 @@ def load_settings(env: dict[str, str] | None = None) -> RuntimeSettings:
     return RuntimeSettings(
         db_path=Path(env.get("VOICESHOP_DB", "results/voiceshop.db")),
         api_key=env.get("VOICESHOP_API_KEY") or None,
+        keys_file=Path(env.get("VOICESHOP_KEYS_FILE", "results/api_keys.json")),
         log_level=env.get("VOICESHOP_LOG_LEVEL", "INFO").upper(),
         gemini_api_key=env.get("VOICESHOP_GEMINI_API_KEY") or env.get("GEMINI_API_KEY") or None,
         gemini_model=env.get("VOICESHOP_GEMINI_MODEL", "gemini-3.5-flash"),

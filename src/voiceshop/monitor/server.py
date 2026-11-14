@@ -12,7 +12,6 @@ Security posture (defaults)
 
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import os
@@ -31,6 +30,7 @@ from urllib.parse import parse_qs, urlparse
 from voiceshop import __version__
 from voiceshop.context import RuntimeContext
 from voiceshop.errors import VoiceShopError
+from voiceshop.monitor.auth import KeyRing, Principal
 from voiceshop.storage.db import SCHEMA_VERSION
 
 PASS_THRESHOLD = 0.9  # share of fully passing cases needed for the gate
@@ -146,7 +146,8 @@ class MonitorApp:
         self,
         ctx: RuntimeContext,
         *,
-        api_key: str | None,
+        api_key: str | None = None,
+        keys: KeyRing | None = None,
         max_concurrent_runs: int,
         max_body_bytes: int,
         local_ui_no_key: bool = False,
@@ -160,7 +161,8 @@ class MonitorApp:
         # {"catalog": Catalog, "store": StoreData, "scenarios": list[StoreScenario], "shops": ShopSessions}
         self.store_bundle = store_bundle
         self.local_ui_no_key = local_ui_no_key
-        self.api_key = api_key
+        self.keys = keys if keys is not None else KeyRing.single(api_key)
+        self.api_key = api_key  # kept for callers that still pass one shared key
         self.max_body = max_body_bytes
         self.metrics = Metrics()
         self._slots = threading.BoundedSemaphore(max_concurrent_runs)
@@ -169,9 +171,7 @@ class MonitorApp:
 
     # ----------------------------------------------------------- auth / limits
     def authorised(self, presented: str | None) -> bool:
-        if not self.api_key or not presented:
-            return False
-        return hmac.compare_digest(presented.encode(), self.api_key.encode())
+        return self.keys.authenticate(presented) is not None
 
     def try_acquire(self) -> bool:
         if self._slots.acquire(blocking=False):
@@ -183,14 +183,15 @@ class MonitorApp:
         self._slots.release()
 
     # ------------------------------------------------------------- background
-    def cancel_suite(self, batch_id: str) -> bool:
+    def cancel_suite(self, batch_id: str, *, actor: str = "api") -> bool:
         event = self._cancels.get(batch_id)
         if event is None:
             return False
         event.set()
+        self.ctx.audit.record("monitor", actor, "suite.cancelled", batch_id)
         return True
 
-    def submit_store_suite(self, test_type: str, pace_ms: int = 0) -> str:
+    def submit_store_suite(self, test_type: str, pace_ms: int = 0, *, actor: str = "api") -> str:
         """Run the multi-agent store suite for a test type, paced and cancellable."""
         from voiceshop.catalog.storerun import run_store_suite
 
@@ -213,7 +214,7 @@ class MonitorApp:
                 run_store_suite(self.ctx, bundle["catalog"], bundle["store"], bundle["scenarios"],
                                 threshold=PASS_THRESHOLD, batch_id=batch_id,
                                 tags=tag_map[test_type], on_turn=pace, stop_event=stop,
-                                shops=bundle["shops"])
+                                shops=bundle["shops"], source=actor)
             except Exception:
                 log.exception("store suite crashed", extra={"batch_id": batch_id})
             finally:
@@ -382,12 +383,9 @@ class _Handler(BaseHTTPRequestHandler):
             return self._shop_action()
         if path != "/api/evals" and not cancel:
             return self._error(404, "not_found", "no such route", "not_found")
-        local_ok = self._local_ui_allowed()
-        if not self.app.api_key and not local_ok:
-            return self._error(403, "api_disabled", "mutating API is disabled: VOICESHOP_API_KEY not set",
-                               path)
-        if not local_ok and not self.app.authorised(self.headers.get("X-API-Key")):
-            return self._error(401, "unauthorised", "missing or invalid API key", path)
+        principal = self._authorise("operator", path)
+        if principal is None:
+            return
         try:
             body = self._read_json() or {}
         except (ValueError, json.JSONDecodeError) as exc:
@@ -397,7 +395,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self._error(400, "bad_request", "pace_ms must be an integer between 0 and 3000", path)
         pace_ms = pace_raw
         if cancel:
-            found = self.app.cancel_suite(cancel.group(1))
+            found = self.app.cancel_suite(cancel.group(1), actor=principal.name)
             if not found:
                 return self._error(404, "not_found", "no running suite with that id", "/api/batches/{id}/cancel")
             return self._json(200, {"cancelled": True}, "/api/batches/{id}/cancel")
@@ -408,10 +406,26 @@ class _Handler(BaseHTTPRequestHandler):
             return self._error(400, "domain_unavailable", "the store suite is not configured", path)
         if not self.app.try_acquire():
             return self._error(429, "busy", "too many runs in progress; retry later", path)
-        batch = self.app.submit_store_suite(test_type, pace_ms)
+        batch = self.app.submit_store_suite(test_type, pace_ms, actor=principal.name)
         return self._json(202, {"batch_id": batch, "runs": f"/api/runs?batch={batch}"}, path)
 
     # --------------------------------------------------------------- helpers
+    def _authorise(self, role: str, route: str) -> Principal | None:
+        """Who is calling, and whether their role allows this route. Sends the error itself and returns None."""
+        if self._local_ui_allowed():
+            return Principal("local-ui", "admin")  # the explicit loopback-only exception
+        if self.app.keys.is_empty:
+            self._error(403, "api_disabled", "mutating API is disabled: no API key is configured", route)
+            return None
+        principal = self.app.keys.authenticate(self.headers.get("X-API-Key"))
+        if principal is None:
+            self._error(401, "unauthorised", "missing or invalid API key", route)
+            return None
+        if not principal.allows(role):
+            self._error(403, "forbidden", f"this action needs the {role} role", route)
+            return None
+        return principal
+
     def _local_ui_allowed(self) -> bool:
         """Opt-in, loopback-only bypass for the dashboard on this machine.
 
@@ -543,11 +557,9 @@ class _Handler(BaseHTTPRequestHandler):
         }
 
     def _settings_save(self) -> None:
-        if not (self.app.api_key or self.app.local_ui_no_key):
-            return self._error(403, "api_disabled", "saving settings is disabled: VOICESHOP_API_KEY not set",
-                               "/api/settings")
-        if not (self._local_ui_allowed() or self.app.authorised(self.headers.get("X-API-Key"))):
-            return self._error(401, "unauthorised", "missing or invalid API key", "/api/settings")
+        principal = self._authorise("admin", "/api/settings")
+        if principal is None:
+            return
         try:
             body = self._read_json() or {}
             url = _valid_storefront_url(body.get("storefront_url"))
@@ -559,18 +571,18 @@ class _Handler(BaseHTTPRequestHandler):
         self.app.storefront_url = url
         if self.app.settings_path is not None:
             _save_settings(self.app.settings_path, url)
+        self.app.ctx.audit.record("monitor", principal.name, "settings.changed", None, storefront_url=url)
         return self._json(200, self._settings_view(), "/api/settings")
 
     def _history_clear(self) -> None:
-        if not (self.app.api_key or self.app.local_ui_no_key):
-            return self._error(403, "api_disabled", "clearing history is disabled: VOICESHOP_API_KEY not set",
-                               "/api/history/clear")
-        if not (self._local_ui_allowed() or self.app.authorised(self.headers.get("X-API-Key"))):
-            return self._error(401, "unauthorised", "missing or invalid API key", "/api/history/clear")
+        principal = self._authorise("admin", "/api/history/clear")
+        if principal is None:
+            return
         if self.app.metrics.active_runs > 0:  # only work that is really executing in this process blocks a clear
             return self._error(409, "busy", "a test is still running; stop it before clearing history",
                                "/api/history/clear")
         removed = self.app.ctx.runs.clear()
+        self.app.ctx.audit.record("monitor", principal.name, "history.cleared", None, removed=removed)
         return self._json(200, {"removed": removed}, "/api/history/clear")
 
     def _store_items(self) -> list[dict[str, Any]]:
@@ -668,7 +680,7 @@ def make_server(app: MonitorApp, host: str = "127.0.0.1", port: int = 8765) -> T
     if app.local_ui_no_key and host not in ("127.0.0.1", "localhost", "::1"):
         raise VoiceShopError("VOICESHOP_LOCAL_UI_NO_KEY is only allowed on a loopback address",
                               code="unsafe_binding")
-    if host not in ("127.0.0.1", "localhost", "::1") and not app.api_key:
+    if host not in ("127.0.0.1", "localhost", "::1") and app.keys.is_empty:
         raise VoiceShopError("refusing to bind a non-loopback address without VOICESHOP_API_KEY",
                               code="unsafe_binding")
     handler = type("Handler", (_Handler,), {"app": app})

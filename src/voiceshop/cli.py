@@ -22,6 +22,7 @@ from voiceshop.config import load_settings
 from voiceshop.context import build_context
 from voiceshop.errors import VoiceShopError
 from voiceshop.logging_utils import configure_logging
+from voiceshop.monitor.auth import KeyRing, hash_key, load_entries, new_key, save_keys
 from voiceshop.monitor.server import MonitorApp, make_server
 
 log = logging.getLogger("voiceshop.cli")
@@ -64,6 +65,15 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("--items", type=Path, default=ROOT / "tests" / "judge" / "calibration.json")
     c.add_argument("--out", type=Path, default=ROOT / "results" / "judge" / "calibration.json")
     c.add_argument("--allow-partial", action="store_true", help="write the result even if some calls failed")
+
+    k = sub.add_parser("keys", help="manage named API keys (the key is shown once, only its hash is stored)")
+    ks = k.add_subparsers(dest="keys_command", required=True)
+    kc = ks.add_parser("create", help="create a key with a role")
+    kc.add_argument("--name", required=True)
+    kc.add_argument("--role", choices=("viewer", "operator", "admin"), required=True)
+    ks.add_parser("list", help="list key names and roles")
+    kr = ks.add_parser("revoke", help="remove a key so it can no longer be used")
+    kr.add_argument("--name", required=True)
 
     v = sub.add_parser("serve", help="start the live monitor and storefront")
     v.add_argument("--host", default="127.0.0.1")
@@ -123,6 +133,30 @@ def main(argv: list[str] | None = None) -> int:
         if args.command in ("judge", "calibrate"):
             return _judge_command(args)
 
+        if args.command == "keys":
+            path = settings.keys_file
+            entries = load_entries(path)
+            if args.keys_command == "list":
+                for e in entries:
+                    print(f"{e['name']:<24} {e['role']}")
+                return 0
+            if args.keys_command == "revoke":
+                kept = [e for e in entries if e["name"] != args.name]
+                if len(kept) == len(entries):
+                    print(f"no key named {args.name!r}", file=sys.stderr)
+                    return 2
+                save_keys(path, kept)
+                print(f"revoked {args.name}")
+                return 0
+            if any(e["name"] == args.name for e in entries):
+                print(f"a key named {args.name!r} already exists; revoke it first", file=sys.stderr)
+                return 2
+            key = new_key()
+            save_keys(path, entries + [{"name": args.name, "role": args.role, "sha256": hash_key(key)}])
+            print(f"created {args.name} ({args.role}). Copy this key now; it is not shown again:")
+            print(key)
+            return 0
+
         if args.command == "regress":
             from voiceshop.evaluation.regression import compare, load_json
 
@@ -171,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
                 log.warning("runs interrupted by a previous stop were marked as errors", extra={"count": interrupted})
             app = MonitorApp(
                 ctx,
-                api_key=settings.api_key,
+                keys=KeyRing.from_file(settings.keys_file) if settings.api_key is None else KeyRing.single(settings.api_key),
                 max_concurrent_runs=settings.max_concurrent_runs,
                 max_body_bytes=settings.max_body_bytes,
                 local_ui_no_key=settings.local_ui_no_key,
@@ -188,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
             if hasattr(signal, "SIGTERM"):
                 signal.signal(signal.SIGTERM, _stop)
             print(f"monitor on http://{args.host}:{args.port}  "
-                  f"(mutating API {'enabled' if app.api_key else 'disabled'})")
+                  f"(mutating API {'enabled' if not app.keys.is_empty else 'disabled'})")
             try:
                 server.serve_forever()
             finally:

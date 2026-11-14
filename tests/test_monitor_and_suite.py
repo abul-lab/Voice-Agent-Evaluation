@@ -236,3 +236,85 @@ def test_a_running_suite_is_stopped_and_drained_on_shutdown(ctx):
     assert app.metrics.active_runs == 0
     assert batch  # the suite was started and then stopped
     app.close()
+
+
+def _ring(tmp_path):
+    from voiceshop.monitor.auth import KeyRing, hash_key
+
+    keys = {"reader": ("viewer", "k-viewer-000000001"), "tester": ("operator", "k-operator-00000002"),
+            "lead": ("admin", "k-admin-0000000003")}
+    entries = [{"name": n, "role": r, "sha256": hash_key(k)} for n, (r, k) in keys.items()]
+    return KeyRing(entries), {n: k for n, (r, k) in keys.items()}
+
+
+def _named_app(ctx, tmp_path):
+    ring, keys = _ring(tmp_path)
+    app = MonitorApp(ctx, keys=ring, max_concurrent_runs=2, max_body_bytes=4096, store_bundle=_bundle(),
+                     settings_path=tmp_path / "monitor_settings.json")
+    base, server = _serve(app)
+    return app, base, server, keys
+
+
+def test_roles_decide_who_can_start_suites_and_change_settings(ctx, tmp_path):
+    app, base, server, keys = _named_app(ctx, tmp_path)
+    try:
+        status, body = _post(base + "/api/evals", {"test_type": "smoke"}, key=keys["reader"])
+        assert status == 403 and body["error"]["code"] == "forbidden"  # viewer cannot start a suite
+        status, body = _post(base + "/api/evals", {"test_type": "bogus"}, key=keys["tester"])
+        assert status == 400  # operator passes the role check; the request itself is what is wrong
+        status, body = _post(base + "/api/settings", {"storefront_url": "http://127.0.0.1:9/shop"},
+                             key=keys["tester"])
+        assert status == 403  # operators cannot change settings
+        status, body = _post(base + "/api/settings", {"storefront_url": "http://127.0.0.1:9/shop"},
+                             key=keys["lead"])
+        assert status == 200
+        status, _ = _post(base + "/api/settings", {"storefront_url": "http://127.0.0.1:9/shop"}, key="wrong-key-00000")
+        assert status == 401
+    finally:
+        server.shutdown()
+        server.server_close()
+        app.close()
+
+
+def test_settings_changes_are_recorded_against_the_person_who_made_them(ctx, tmp_path):
+    app, base, server, keys = _named_app(ctx, tmp_path)
+    try:
+        status, _ = _post(base + "/api/settings", {"storefront_url": "http://127.0.0.1:9/shop"}, key=keys["lead"])
+        assert status == 200
+        events = app.ctx.audit.list("monitor")
+        changed = [e for e in events if e["action"] == "settings.changed"]
+        assert changed and changed[-1]["actor"] == "lead"
+    finally:
+        server.shutdown()
+        server.server_close()
+        app.close()
+
+
+def test_a_revoked_key_is_refused(tmp_path):
+    from voiceshop.monitor.auth import KeyRing, hash_key, load_entries, save_keys
+
+    path = tmp_path / "api_keys.json"
+    save_keys(path, [{"name": "gone", "role": "admin", "sha256": hash_key("k-gone-0000000000001")}])
+    assert KeyRing(load_entries(path)).authenticate("k-gone-0000000000001").name == "gone"
+    save_keys(path, [])  # revoked: the entry is removed from the key file
+    assert KeyRing(load_entries(path)).authenticate("k-gone-0000000000001") is None
+
+
+def test_the_key_file_holds_hashes_never_the_keys(tmp_path):
+    from voiceshop.monitor.auth import KeyRing, hash_key, load_entries, new_key, save_keys
+
+    key = new_key()
+    path = tmp_path / "api_keys.json"
+    save_keys(path, [{"name": "qe-lead", "role": "admin", "sha256": hash_key(key)}])
+    text = path.read_text(encoding="utf-8")
+    assert key not in text
+    assert KeyRing(load_entries(path)).authenticate(key).role == "admin"
+
+
+def test_damaged_key_files_are_refused(tmp_path):
+    from voiceshop.monitor.auth import KeyFileError, KeyRing
+
+    with pytest.raises(KeyFileError):
+        KeyRing([{"name": "x", "role": "root", "sha256": "0" * 64}])  # unknown role
+    with pytest.raises(KeyFileError):
+        KeyRing([{"name": "x", "role": "admin", "sha256": "not-a-hash"}])

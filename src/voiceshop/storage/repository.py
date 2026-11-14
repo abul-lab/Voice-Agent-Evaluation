@@ -43,6 +43,40 @@ class AuditLog:
         return [{**dict(r), "detail": json.loads(r["detail"])} for r in rows]
 
 
+class RefundLedger:
+    """Approved refunds, one per order within a scope. Checking and recording happen in one transaction."""
+
+    def __init__(self, db_path: Path) -> None:
+        self._db = db_path
+
+    def issue(self, scope: str, order_id: str, amount: int, policy_version: str, actor: str) -> tuple[dict[str, Any], bool]:
+        """Returns (record, duplicate). The first call approves; later calls return the original record."""
+        with session(self._db) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute("SELECT * FROM refunds WHERE scope=? AND order_id=?", (scope, order_id)).fetchone()
+                if row is not None:
+                    conn.execute("COMMIT")
+                    return dict(row), True
+                record = {"scope": scope, "order_id": order_id, "amount": amount,
+                          "policy_version": policy_version, "status": "approved", "actor": actor, "created_at": _now()}
+                conn.execute(
+                    "INSERT INTO refunds (scope, order_id, amount, policy_version, status, actor, created_at) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (scope, order_id, amount, policy_version, "approved", actor, record["created_at"]),
+                )
+                conn.execute("COMMIT")
+                return record, False
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+    def get(self, scope: str, order_id: str) -> dict[str, Any] | None:
+        with session(self._db) as conn:
+            row = conn.execute("SELECT * FROM refunds WHERE scope=? AND order_id=?", (scope, order_id)).fetchone()
+        return dict(row) if row else None
+
+
 class RunRepository:
     """Persistence for simulation runs and their turn-by-turn transcripts (read by the monitor)."""
 

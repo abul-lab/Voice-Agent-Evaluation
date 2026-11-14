@@ -122,7 +122,8 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
     ctx.runs.create(run_id, scenario.id, "rules", "store", batch_id)
     shops = shops or ShopSessions()
     # The storefront session is keyed by the run id, so the page shows exactly this conversation's cart.
-    gateway = ToolGateway(store, ctx.audit, tenant=run_id, faults=scenario.faults, catalog=catalog, shops=shops)
+    gateway = ToolGateway(store, ctx.audit, tenant=run_id, ledger=ctx.refunds, faults=scenario.faults,
+                          catalog=catalog, shops=shops)
     conductor = Conductor(catalog, store, gateway, scenario.today, sessions=shops, sid=run_id)
     rng = random.Random(scenario.seed)
     caller = ShopperSimulator(list(scenario.goals), rng, scenario.off_topic_first)

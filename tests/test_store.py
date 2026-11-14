@@ -8,7 +8,7 @@ import pytest
 from voiceshop.catalog.model import Catalog
 from voiceshop.catalog.multiagent import Conductor
 from voiceshop.catalog.store import SCOPES, StoreData, ToolDenied, ToolGateway
-from voiceshop.storage.repository import AuditLog
+from voiceshop.storage.repository import AuditLog, RefundLedger
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
@@ -27,7 +27,7 @@ def catalog():
 
 @pytest.fixture
 def gateway(store, ctx):
-    return ToolGateway(store, AuditLog(ctx.db_path), tenant="t-store")
+    return ToolGateway(store, AuditLog(ctx.db_path), tenant="t-store", ledger=RefundLedger(ctx.db_path))
 
 
 def _conductor(catalog, store, gateway):
@@ -124,3 +124,35 @@ def test_store_suite_gate_passes(ctx):
     report = run_store_suite(ctx, Catalog.load(DATA), StoreData(DATA), scenarios, threshold=0.9)
     assert report["summary"]["errors"] == 0
     assert report["summary"]["gate_passed"], report["failures"]
+
+
+def test_a_refund_approved_before_a_restart_is_still_a_duplicate_after_it(store, ctx):
+    """The approval lives in the database, so a new process cannot approve the same order again."""
+    order = store.orders["NW-1001"]
+    first = ToolGateway(store, AuditLog(ctx.db_path), tenant="restart", ledger=RefundLedger(ctx.db_path))
+    _, dup1 = first.issue_refund("refund", order, order.total, store.policy["version"])
+    second = ToolGateway(store, AuditLog(ctx.db_path), tenant="restart", ledger=RefundLedger(ctx.db_path))
+    record, dup2 = second.issue_refund("refund", order, order.total, store.policy["version"])
+    assert dup1 is False and dup2 is True
+    assert record["amount"] == order.total
+
+
+def test_concurrent_approvals_for_one_order_produce_exactly_one(store, ctx):
+    import threading
+
+    order = store.orders["NW-1001"]
+    results: list[bool] = []
+    lock = threading.Lock()
+
+    def attempt():
+        gw = ToolGateway(store, AuditLog(ctx.db_path), tenant="race", ledger=RefundLedger(ctx.db_path))
+        _, dup = gw.issue_refund("refund", order, order.total, store.policy["version"])
+        with lock:
+            results.append(dup)
+
+    threads = [threading.Thread(target=attempt) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert results.count(False) == 1 and results.count(True) == 7

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from voiceshop.config import RuntimeSettings, load_settings
 from voiceshop.storage.db import migrate
-from voiceshop.storage.repository import AuditLog, RunRepository
+from voiceshop.storage.repository import AuditLog, RefundLedger, RunRepository
 
 
 @dataclass
@@ -19,13 +19,15 @@ class RuntimeContext:
     db_path: Path
     audit: AuditLog
     runs: RunRepository
+    refunds: RefundLedger
 
 
 def build_context(settings: RuntimeSettings | None = None, db_path: Path | None = None) -> RuntimeContext:
     settings = settings or load_settings()
     path = Path(db_path or settings.db_path)
     migrate(path)
-    return RuntimeContext(db_path=path, audit=AuditLog(path), runs=RunRepository(path))
+    return RuntimeContext(db_path=path, audit=AuditLog(path), runs=RunRepository(path),
+                          refunds=RefundLedger(path))
 
 
 def new_run_id(scenario_id: str) -> str:

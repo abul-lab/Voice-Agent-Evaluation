@@ -97,10 +97,10 @@ def test_stage_latency_comes_from_the_recorded_turns():
     assert out["route_ms"]["n"] == 2 and out["route_ms"]["p50"] == 2.0
 
 
-def test_the_router_reports_time_for_each_step():
+def test_the_router_reports_time_for_each_step(ctx):
     catalog = Catalog.load(DATA)
     store = StoreData(DATA)
-    gw = ToolGateway(store, _NullAudit(), tenant="t")
+    gw = ToolGateway(store, _NullAudit(), tenant="t", ledger=ctx.refunds)
     cond = Conductor(catalog, store, gw, date(2026, 11, 16))
     reply = cond.respond("Where is my order NW-1002?")
     assert set(reply.stages) == {"understand_ms", "route_ms", "dispatch_ms"}

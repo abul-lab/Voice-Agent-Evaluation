@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _MIGRATIONS: dict[int, list[str]] = {
     1: [
@@ -62,6 +62,22 @@ _MIGRATIONS: dict[int, list[str]] = {
     2: [
         # Per-step timing of each agent reply (understand, route, dispatch), as JSON.
         "ALTER TABLE turns ADD COLUMN stages TEXT",
+    ],
+    3: [
+        # Approved refunds: one row per order within a scope. The primary key is what makes a second
+        # approval impossible, even across processes and restarts.
+        """
+        CREATE TABLE IF NOT EXISTS refunds (
+            scope          TEXT NOT NULL,
+            order_id       TEXT NOT NULL,
+            amount         INTEGER NOT NULL,
+            policy_version TEXT NOT NULL,
+            status         TEXT NOT NULL,
+            actor          TEXT NOT NULL,
+            created_at     TEXT NOT NULL,
+            PRIMARY KEY (scope, order_id)
+        )
+        """,
     ],
 }
 

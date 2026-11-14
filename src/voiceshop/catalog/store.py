@@ -19,7 +19,7 @@ from typing import Any
 from voiceshop.catalog import shop as _shop
 from voiceshop.catalog.model import Catalog
 from voiceshop.errors import ConfigError
-from voiceshop.storage.repository import AuditLog
+from voiceshop.storage.repository import AuditLog, RefundLedger
 
 SCOPES: dict[str, frozenset[str]] = {
     "shopping": frozenset({"catalog:read", "cart:write", "checkout:write"}),
@@ -109,13 +109,14 @@ class StoreData:
 class ToolGateway:
     """The only path from an agent to back-office data. Scope checks, faults and audit happen here."""
 
-    def __init__(self, store: StoreData, audit: AuditLog, tenant: str, faults: dict[str, int] | None = None,
+    def __init__(self, store: StoreData, audit: AuditLog, tenant: str, ledger: RefundLedger,
+                 faults: dict[str, int] | None = None,
                  *, catalog: Catalog | None = None, shops: _shop.ShopSessions | None = None) -> None:
         self.store = store
         self.audit = audit
         self.tenant = tenant
+        self.ledger = ledger
         self.faults = dict(faults or {})
-        self._refunds: dict[str, dict[str, Any]] = {}
         self.catalog = catalog
         self.shops = shops
 
@@ -142,14 +143,14 @@ class ToolGateway:
         """Idempotent on order id. Returns (record, duplicate)."""
         self._authorise(agent, "issue_refund")
         self._maybe_fault(agent, "issue_refund")
-        if order.id in self._refunds:
+        record, duplicate = self.ledger.issue(self.tenant, order.id, amount, policy_version, agent)
+        if duplicate:
             self.audit.record(self.tenant, agent, "refund.duplicate", order.id)
-            return self._refunds[order.id], True
-        record = {"order": order.id, "amount": amount, "policy_version": policy_version, "status": "approved"}
-        self._refunds[order.id] = record
+            return {"order": order.id, "amount": record["amount"], "policy_version": record["policy_version"],
+                    "status": record["status"]}, True
         self.audit.record(self.tenant, agent, "refund.approved", order.id, amount=amount,
                           policy_version=policy_version)
-        return record, False
+        return {"order": order.id, "amount": amount, "policy_version": policy_version, "status": "approved"}, False
 
     def record_refusal(self, agent: str, order_no: str, rule_id: str, policy_version: str) -> None:
         self.audit.record(self.tenant, agent, "refund.refused", order_no, rule_id=rule_id,

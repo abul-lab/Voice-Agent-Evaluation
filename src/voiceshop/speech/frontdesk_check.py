@@ -53,7 +53,7 @@ def main() -> int:
     catalog, store = Catalog.load(DATA), StoreData(DATA)
 
     def new_front_desk() -> Conductor:
-        gateway = ToolGateway(store, ctx.audit, tenant="speech-frontdesk")
+        gateway = ToolGateway(store, ctx.audit, tenant="speech-frontdesk", ledger=ctx.refunds)
         return Conductor(catalog, store, gateway, TODAY)
 
     try:

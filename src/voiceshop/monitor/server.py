@@ -134,11 +134,13 @@ class MonitorApp:
         store_bundle: dict[str, Any] | None = None,
         settings_path: Path | None = None,
         changes_per_minute: int = 30,
+        gemini_key: str | None = None,
         trust_proxy: bool = False,
         attempts_per_minute: int = 60,
     ) -> None:
         self.ctx = ctx
         self.trust_proxy = trust_proxy
+        self.gemini_key = gemini_key  # for runs whose front desk routes with Gemini
         self.limit_changes = TokenBucket(changes_per_minute)  # per person, for changes
         self.limit_attempts = TokenBucket(attempts_per_minute)  # per client address, for every mutating try
         # Monitor settings (the storefront URL). None means "this monitor's own /shop page".
@@ -177,9 +179,12 @@ class MonitorApp:
         self.ctx.audit.record("monitor", actor, "suite.cancelled", batch_id)
         return True
 
-    def submit_store_suite(self, test_type: str, pace_ms: int = 0, *, actor: str = "api") -> str:
+    def submit_store_suite(self, test_type: str, pace_ms: int = 0, *, actor: str = "api", mode: str = "rules") -> str:
         """Run the multi-agent store suite for a test type, paced and cancellable."""
+        from voiceshop.catalog.route_gemini import GeminiRouteClassifier
         from voiceshop.catalog.storerun import run_store_suite
+
+        classifier = GeminiRouteClassifier(self.gemini_key) if mode == "gemini" else None
 
         bundle = self.store_bundle or {}
         tag_map = {"smoke": {"smoke"}, "targeted": {"targeted"}, "regression": set()}
@@ -200,7 +205,7 @@ class MonitorApp:
                 report = run_store_suite(self.ctx, bundle["catalog"], bundle["store"], bundle["scenarios"],
                                 threshold=PASS_THRESHOLD, batch_id=batch_id,
                                 tags=tag_map[test_type], on_turn=pace, stop_event=stop,
-                                shops=bundle["shops"], source=actor)
+                                shops=bundle["shops"], source=actor, mode=mode, classifier=classifier)
                 if not stop.is_set():  # a stopped suite is incomplete: it must not change the quality measures
                     self.metrics.record_suite(report["summary"])
             except Exception:
@@ -311,6 +316,7 @@ class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
                     "domains": ["store"],
                     "agents": {k: sorted(v) for k, v in _store_scopes().items()},
                     "local_ui_no_key": self.app.local_ui_no_key,
+                    "gemini_routing": bool(self.app.gemini_key),
                 }, "/api/capabilities")
             if path == "/healthz":
                 return self._json(200, {"status": "ok", "version": __version__}, "/healthz")
@@ -390,11 +396,16 @@ class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
         test_type = body.get("test_type", "smoke")
         if test_type not in ("smoke", "targeted", "regression"):
             return self._error(400, "bad_request", "test_type must be smoke, targeted or regression", path)
+        mode = body.get("mode", "rules")
+        if mode not in ("rules", "gemini"):
+            return self._error(400, "bad_request", "mode must be rules or gemini", path)
+        if mode == "gemini" and not self.app.gemini_key:
+            return self._error(400, "gemini_not_configured", "Gemini is not configured: set GEMINI_API_KEY", path)
         if not self.app.store_bundle:
             return self._error(400, "domain_unavailable", "the store suite is not configured", path)
         if not self.app.try_acquire():
             return self._error(429, "busy", "too many runs in progress; retry later", path)
-        batch = self.app.submit_store_suite(test_type, pace_ms, actor=principal.name)
+        batch = self.app.submit_store_suite(test_type, pace_ms, actor=principal.name, mode=mode)
         # The audit entry carries the request id, so one identifier links the HTTP call, its log lines and the work.
         self.app.ctx.audit.record("monitor", principal.name, "suite.started", batch,
                                   request_id=self._request_id, test_type=test_type)

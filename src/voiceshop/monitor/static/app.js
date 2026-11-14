@@ -77,6 +77,11 @@
     try {
       const caps = await api("/api/capabilities");
       state.keyRequired = caps.api_key_required;
+      const geminiOption = document.querySelector('#mode-select option[value="gemini"]');
+      if (geminiOption && !caps.gemini_routing) {
+        geminiOption.disabled = true;
+        geminiOption.textContent = "Gemini (not configured)";
+      }
       if (caps.agents && window.AgentView) window.AgentView.setScopes(caps.agents);
       $("key-field").classList.toggle("hidden", !caps.api_key_required);
     } catch (err) {
@@ -600,6 +605,7 @@
         body: JSON.stringify({
           test_type: $("test-type").value,
           domain: "store",
+          mode: $("mode-select").value,
           pace_ms: Number($("speed-select").value),
         }),
       });

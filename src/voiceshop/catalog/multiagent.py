@@ -102,7 +102,8 @@ class FrontDeskRouter:
     """Routes each caller turn to one specialist and returns that specialist's reply."""
 
     def __init__(self, catalog: Catalog, store: StoreData, gateway: ToolGateway, today: date,
-                 sessions: ShopSessions | None = None, sid: str | None = None) -> None:
+                 sessions: ShopSessions | None = None, sid: str | None = None, classifier=None) -> None:
+        self.classifier = classifier  # optional: Gemini chooses the team (see route_gemini.py)
         self.catalog = catalog
         self.store = store
         self.gateway = gateway
@@ -146,6 +147,10 @@ class FrontDeskRouter:
                                    u.intent, started, terminal=True)
             return self._reply("router", "safety_hold", {}, SAFETY_TEXT, u.intent, started)
         target = self._route(utterance, f, u)
+        if self.classifier is not None and target != "close":
+            team = self.classifier.classify(utterance)  # raises on failure: the case is an error, not a fall-back
+            if team is not None:
+                target = team
         t_routed = _clock.perf_counter()
         self._stage["route_ms"] = round((t_routed - t_understood) * 1000, 3)
 

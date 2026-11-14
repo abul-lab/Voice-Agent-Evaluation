@@ -119,14 +119,16 @@ class AmbientAsr:
 
 
 def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreScenario, *, source: str = "store",
+                       mode: str = "rules", classifier=None,
                        batch_id: str | None = None, on_turn=None, shops: ShopSessions | None = None) -> StoreRun:
     run_id = f"{scenario.id}-{uuid.uuid4().hex[:8]}"
-    ctx.runs.create(run_id, scenario.id, "rules", source, batch_id)
+    ctx.runs.create(run_id, scenario.id, mode, source, batch_id)
     shops = shops or ShopSessions()
     # The storefront session is keyed by the run id, so the page shows exactly this conversation's cart.
     gateway = ToolGateway(store, ctx.audit, tenant=run_id, ledger=ctx.refunds, faults=scenario.faults,
                           catalog=catalog, shops=shops)
-    conductor = FrontDeskRouter(catalog, store, gateway, scenario.today, sessions=shops, sid=run_id)
+    conductor = FrontDeskRouter(catalog, store, gateway, scenario.today, sessions=shops, sid=run_id,
+                                classifier=classifier)
     rng = random.Random(scenario.seed)
     caller = ShopperSimulator(list(scenario.goals), rng, scenario.off_topic_first)
     asr = AsrNoise(scenario.asr_error_rate, rng)
@@ -383,15 +385,16 @@ def _category(catalog: Catalog, text: str) -> str | None:
 def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[StoreScenario], *,
                     threshold: float, out_dir: Path | None = None, tags: set[str] | None = None,
                     batch_id: str | None = None, on_turn=None, stop_event=None,
-                    shops: ShopSessions | None = None, source: str = "store") -> dict[str, Any]:
+                    shops: ShopSessions | None = None, source: str = "store", mode: str = "rules",
+                    classifier=None) -> dict[str, Any]:
     batch_id = batch_id or datetime.now(UTC).strftime("store-%Y%m%dT%H%M%S")
     selected = [s for s in scenarios if not tags or set(s.tags) & tags]
     records: list[dict[str, Any]] = []
     for scenario in selected:
         if stop_event is not None and stop_event.is_set():
             break
-        run = run_store_scenario(ctx, catalog, store, scenario, source=source, batch_id=batch_id, on_turn=on_turn,
-                                 shops=shops)
+        run = run_store_scenario(ctx, catalog, store, scenario, source=source, mode=mode, classifier=classifier,
+                                 batch_id=batch_id, on_turn=on_turn, shops=shops)
         audit = ctx.audit.list(run.run_id)
         checks, metrics = evaluate_store_run(catalog, store, run, audit)
         passed = run.error is None and all(c.passed for c in checks)

@@ -514,7 +514,11 @@ table.cases .case-name { font-weight: 600; }
 .side-stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 0; }
 .side-stack .table-card { position: static; max-height: 620px; margin-top: 10px; }
 .layout { grid-template-columns: minmax(0, 1fr); }
-.layout .center { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* Outcome and agent timeline side by side, under the monitor. Stacked again on narrow screens. */
+.layout .center { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: start; min-width: 0; }
+.layout .center > .card { min-width: 0; }
+.layout .center #lanes { overflow-x: auto; }
+@media (max-width: 1100px) { .layout .center { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- buttons used by the reset and history pages ---------- */
 .btn.danger { background: var(--bad-soft); color: var(--bad); border: 1px solid #fecaca; }

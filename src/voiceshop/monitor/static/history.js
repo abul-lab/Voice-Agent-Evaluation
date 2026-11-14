@@ -2,6 +2,20 @@
 (() => {
   "use strict";
 
+  // Step timings of an agent reply, stored as JSON text in the database.
+  function stagesOf(turn) {
+    let s = turn.stages;
+    if (typeof s === "string") {
+      try { s = JSON.parse(s); } catch (err) { return null; }
+    }
+    return s && typeof s === "object" ? s : null;
+  }
+
+  function stageText(s) {
+    const v = (x) => (typeof x === "number" ? x.toFixed(1) : "–");
+    return `understand ${v(s.understand_ms)} · route ${v(s.route_ms)} · dispatch ${v(s.dispatch_ms)} ms`;
+  }
+
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -119,6 +133,8 @@
         refund: "Refunds Agent", care: "Customer Care Agent",
       };
       meta2.appendChild(el("span", "tag", t.speaker === "customer" ? "Customer" : (HISTORY_AGENT[t.agent] || "Voice agent")));
+      const steps = stagesOf(t);
+      if (steps) meta2.appendChild(el("span", "tag timing", stageText(steps)));
       if (t.act) meta2.appendChild(el("span", "tag act", t.act));
       wrap.appendChild(meta2);
       wrap.appendChild(el("div", "bubble", t.text_spoken));

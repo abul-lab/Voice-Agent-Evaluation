@@ -152,6 +152,8 @@ export GEMINI_API_KEY=...        # Windows PowerShell: $env:GEMINI_API_KEY = "..
 python -m voiceshop.speech.frontdesk_check
 ```
 
+The check also measures the **round trip**: from the caller's audio being sent for transcription, to the agent's spoken reply being ready. It reports the time for each part (speech to text, routing, and speech out). The limit of 3 seconds is a starting point; the quality owner sets the real value.
+
 Evidence (audio and a JSON report) is written to `results/speech/frontdesk_case/`. The key is read from the environment and is never written to the repository or to reports. Models are named in each report. Speech services are external and may change, so the report records which model was used.
 
 Speech checks are not part of CI because they need a key and call an external service.

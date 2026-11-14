@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 from datetime import date
 from pathlib import Path
 
@@ -31,6 +32,7 @@ OUT = ROOT / "results" / "speech" / "frontdesk_case"
 TODAY = date(2026, 11, 16)
 CALLER_LINE = "Hello, I would like a refund for my tent, please."
 WER_LIMIT = 0.10  # starting point for clean audio; the director sets the real gate
+ROUND_TRIP_LIMIT_MS = 3000.0  # starting point: caller's audio in, agent's spoken reply out
 EXPECT_INTRO = "I'll connect you with our refunds team."
 
 
@@ -60,7 +62,9 @@ def main() -> int:
 
         caller_wav = speech.synthesize(CALLER_LINE, voice="Puck")  # a different voice from the agent's
         (OUT / "caller.wav").write_bytes(caller_wav)
+        t_stt0 = time.perf_counter()
         heard = speech.transcribe(caller_wav)
+        t_stt1 = time.perf_counter()
     except SpeechError as exc:
         print(f"speech service error: {exc}", file=sys.stderr)
         return 3
@@ -69,8 +73,25 @@ def main() -> int:
     checks: list[dict] = [{"name": "word_error_rate", "passed": wer <= WER_LIMIT,
                            "detail": f"{wer:.1%} (limit {WER_LIMIT:.0%})"}]
 
+    t_route0 = time.perf_counter()
     reply_heard = new_front_desk().respond(heard)
+    t_route1 = time.perf_counter()
+    try:
+        reply_wav = speech.synthesize(reply_heard.text, voice="Kore")  # the agent's spoken reply
+    except SpeechError as exc:
+        print(f"speech service error: {exc}", file=sys.stderr)
+        return 3
+    (OUT / "reply.wav").write_bytes(reply_wav)
+    t_tts1 = time.perf_counter()
     reply_exact = new_front_desk().respond(CALLER_LINE)
+    timing = {
+        "speech_to_text_ms": round((t_stt1 - t_stt0) * 1000, 1),
+        "route_ms": round((t_route1 - t_route0) * 1000, 1),
+        "text_to_speech_ms": round((t_tts1 - t_route1) * 1000, 1),
+        "round_trip_ms": round((t_tts1 - t_stt0) * 1000, 1),
+    }
+    checks.append({"name": "speech_round_trip", "passed": timing["round_trip_ms"] <= ROUND_TRIP_LIMIT_MS,
+                   "detail": f"{timing['round_trip_ms']:.0f} ms (limit {ROUND_TRIP_LIMIT_MS:.0f} ms)"})
     checks.append({"name": "routed_to_refunds", "passed": reply_heard.agent == "refund",
                    "detail": f"heard -> {reply_heard.agent}; exact text -> {reply_exact.agent}"})
     checks.append({"name": "handoff_announced", "passed": EXPECT_INTRO in reply_heard.text,
@@ -87,6 +108,7 @@ def main() -> int:
         "heard": heard,
         "greeting": greeting.text,
         "agent_reply": reply_heard.text,
+        "timing_ms": timing,
         "passed": passed,
         "checks": checks,
     }

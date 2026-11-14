@@ -293,6 +293,22 @@
   }
 
   // ---------------------------------------------------------------- transcript
+
+  // Step timings of an agent reply: understand, route and dispatch, in milliseconds. Stored as JSON text
+  // in the database and as an object on the live stream, so both forms are accepted.
+  function stagesOf(turn) {
+    let s = turn.stages;
+    if (typeof s === "string") {
+      try { s = JSON.parse(s); } catch (err) { return null; }
+    }
+    return s && typeof s === "object" ? s : null;
+  }
+
+  function stageText(s) {
+    const v = (x) => (typeof x === "number" ? x.toFixed(1) : "–");
+    return `understand ${v(s.understand_ms)} · route ${v(s.route_ms)} · dispatch ${v(s.dispatch_ms)} ms`;
+  }
+
   function renderTurn(turn) {
     const wrap = el("div", `turn ${turn.speaker}`);
     const meta = el("div", "turn-meta");
@@ -303,6 +319,12 @@
       meta.appendChild(el("span", "tag", AGENT_LABELS[turn.agent] || "Voice agent"));
       if (turn.act) meta.appendChild(el("span", "tag act", turn.act));
       if (turn.latency_ms != null) meta.appendChild(el("span", "tag", `${Math.round(turn.latency_ms)} ms`));
+      const steps = stagesOf(turn);
+      if (steps) {
+        const tag = el("span", "tag timing", stageText(steps));
+        tag.title = "Time spent on each step of this reply";
+        meta.appendChild(tag);
+      }
       if (turn.act === "close") meta.appendChild(el("span", "tag close", "call ended"));
     }
     wrap.appendChild(meta);

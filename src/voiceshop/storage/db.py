@@ -90,6 +90,10 @@ def migrate(path: str | Path) -> int:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with session(path) as conn:
         current = conn.execute("PRAGMA user_version").fetchone()[0]
+        if current > SCHEMA_VERSION:
+            # Refuse rather than run against a schema this code does not know: writes would fail or lose data.
+            raise RuntimeError(f"database schema {current} is newer than this code ({SCHEMA_VERSION}); "
+                               "point VOICESHOP_DB at a new file")
         for version in range(current + 1, SCHEMA_VERSION + 1):
             conn.execute("BEGIN IMMEDIATE")
             try:

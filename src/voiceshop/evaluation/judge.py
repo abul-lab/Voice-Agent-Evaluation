@@ -16,10 +16,10 @@ from __future__ import annotations
 import json
 import os
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+
+from voiceshop.net import ServiceError, post_json
 
 RUBRIC = """You are grading one reply from a shopping voice assistant.
 
@@ -142,26 +142,10 @@ class GeminiBackend:
 
 
 def _post_json(url: str, body: dict[str, Any], headers: dict[str, str], timeout_s: float) -> dict[str, Any]:
-    req = urllib.request.Request(  # noqa: S310 - the backend URL is configured by the operator
-        url, data=json.dumps(body).encode("utf-8"), method="POST",
-        headers={"Content-Type": "application/json", **headers},
-    )
-    last: Exception | None = None
-    for attempt in range(4):  # back off on rate limits and temporary server errors only
-        try:
-            with urllib.request.urlopen(req, timeout=timeout_s) as r:  # noqa: S310
-                return json.loads(r.read())
-        except urllib.error.HTTPError as exc:
-            if exc.code not in (429, 500, 503):
-                raise JudgeError(f"judge backend returned HTTP {exc.code}") from None
-            last = exc
-            time.sleep(2 ** (attempt + 1))
-        except (urllib.error.URLError, TimeoutError) as exc:
-            last = exc
-            time.sleep(2 ** (attempt + 1))
-    code = getattr(last, "code", None)
-    raise JudgeError(f"judge backend unavailable after retries (HTTP {code})" if code
-                     else f"judge backend unavailable after retries ({type(last).__name__})")
+    try:
+        return post_json(url, body, headers, timeout_s=timeout_s)
+    except ServiceError as exc:
+        raise JudgeError(f"judge backend: {exc}") from None
 
 
 def make_backend(name: str, model: str | None) -> JudgeBackend:

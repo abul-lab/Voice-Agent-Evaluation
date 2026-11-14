@@ -9,14 +9,12 @@ from __future__ import annotations
 
 import base64
 import io
-import json
 import os
 import re
-import time
-import urllib.error
-import urllib.request
 import wave
 from dataclasses import dataclass
+
+from voiceshop.net import ServiceError, post_json
 
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts"
@@ -40,25 +38,11 @@ class GeminiSpeech:
     timeout_s: float = 120.0
 
     def _call(self, model: str, body: dict) -> dict:
-        req = urllib.request.Request(  # noqa: S310 - fixed https host only
-            ENDPOINT.format(model=model), data=json.dumps(body).encode("utf-8"), method="POST",
-            headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
-        )
-        last: Exception | None = None
-        for attempt in range(3):  # back off on rate limits and temporary server errors only
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout_s) as r:  # noqa: S310 - fixed https host
-                    return json.loads(r.read())
-            except urllib.error.HTTPError as exc:
-                last = exc
-                if exc.code not in (429, 500, 503):
-                    detail = exc.read().decode("utf-8", "replace")[:200]
-                    raise SpeechError(f"{model} returned HTTP {exc.code}: {detail}") from None
-                time.sleep(2 ** attempt)
-            except (urllib.error.URLError, TimeoutError) as exc:
-                last = exc
-                time.sleep(2 ** attempt)
-        raise SpeechError(f"{model} unavailable after retries ({type(last).__name__})")
+        try:
+            return post_json(ENDPOINT.format(model=model), body, {"x-goog-api-key": self.api_key},
+                             timeout_s=self.timeout_s, attempts=3)
+        except ServiceError as exc:
+            raise SpeechError(f"{model}: {exc}") from None
 
     def synthesize(self, text: str, voice: str = DEFAULT_VOICE) -> bytes:
         """Return WAV bytes of the spoken text."""

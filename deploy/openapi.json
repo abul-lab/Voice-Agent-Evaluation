@@ -1,0 +1,401 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Voice Shopping Evaluation Monitor API",
+    "version": "0.1.0",
+    "description": "Endpoints of the monitor. Changes need a named key with the role shown; see README."
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readiness: database reachable",
+        "responses": {
+          "200": {
+            "description": "ready"
+          },
+          "503": {
+            "description": "not ready"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus metrics",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/api/capabilities": {
+      "get": {
+        "summary": "Scopes per agent and whether a key is required",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "Storefront address and voice agents",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      },
+      "post": {
+        "summary": "Change the storefront address",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          },
+          "401": {
+            "description": "missing or invalid key"
+          },
+          "403": {
+            "description": "role does not allow this"
+          },
+          "429": {
+            "description": "rate limited"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-role": "admin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios": {
+      "get": {
+        "summary": "List the test cases and their tiers",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "summary": "List runs, newest first",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/api/runs/{id}": {
+      "get": {
+        "summary": "One run",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/turns": {
+      "get": {
+        "summary": "Turns of a run",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/audit": {
+      "get": {
+        "summary": "Audit trail of a run",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/stream": {
+      "get": {
+        "summary": "Live turns of a run (server-sent events)",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/evals": {
+      "post": {
+        "summary": "Start a test tier (smoke, targeted or regression)",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          },
+          "401": {
+            "description": "missing or invalid key"
+          },
+          "403": {
+            "description": "role does not allow this"
+          },
+          "429": {
+            "description": "rate limited"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-role": "operator",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/batches/{id}/cancel": {
+      "post": {
+        "summary": "Stop a running suite",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          },
+          "401": {
+            "description": "missing or invalid key"
+          },
+          "403": {
+            "description": "role does not allow this"
+          },
+          "429": {
+            "description": "rate limited"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-role": "operator",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/history/clear": {
+      "post": {
+        "summary": "Remove run history (the audit trail is kept)",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          },
+          "401": {
+            "description": "missing or invalid key"
+          },
+          "403": {
+            "description": "role does not allow this"
+          },
+          "429": {
+            "description": "rate limited"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-role": "admin"
+      }
+    },
+    "/shop/api/catalog": {
+      "get": {
+        "summary": "Storefront catalogue",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/shop/api/state": {
+      "get": {
+        "summary": "Storefront state for a session",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/shop/api/stream": {
+      "get": {
+        "summary": "Storefront changes (server-sent events)",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        }
+      }
+    },
+    "/shop/api/action": {
+      "post": {
+        "summary": "A shopper's action on the storefront",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "400": {
+            "description": "bad request"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

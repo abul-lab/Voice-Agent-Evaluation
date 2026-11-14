@@ -356,3 +356,25 @@ def test_behind_a_trusted_proxy_each_client_is_limited_separately(ctx, tmp_path)
         server.shutdown()
         server.server_close()
         app.close()
+
+
+def test_the_api_description_matches_the_routes_the_server_answers(live):
+    """Drift check: every path in deploy/openapi.json must be a real route (not 'no such route')."""
+    import re
+
+    base, _ = live
+    spec = json.loads((ROOT / "deploy" / "openapi.json").read_text(encoding="utf-8"))
+    for path, methods in spec["paths"].items():
+        for method in methods:
+            url = base + re.sub(r"\{[^}]+\}", "probe-run-1", path)
+            req = urllib.request.Request(url, method=method.upper(), data=b"{}" if method != "get" else None,
+                                         headers={"Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=5) as r:  # noqa: S310
+                    code = r.status
+                    # A live event stream never ends: its status is enough, the body is not read.
+                    text = b"" if path.endswith("/stream") else r.read()
+            except urllib.error.HTTPError as err:
+                code, text = err.code, err.read()
+            is_missing = code == 404 and b'"not_found"' in text and b"no such route" in text
+            assert not is_missing, f"{method.upper()} {path} is in the description but the server has no such route"

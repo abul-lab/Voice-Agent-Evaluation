@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,8 +16,10 @@ const base = `http://127.0.0.1:${port}`;
 let server;
 let browser;
 
-const python = process.platform === 'win32'
+// Use VOICESHOP_PYTHON if set, else the project's virtual environment, else python on the PATH (CI).
+const venvPython = process.platform === 'win32'
   ? join(repo, '.venv', 'Scripts', 'python.exe') : join(repo, '.venv', 'bin', 'python');
+const python = process.env.VOICESHOP_PYTHON || (existsSync(venvPython) ? venvPython : 'python');
 
 async function waitFor(url, tries = 60) {
   for (let i = 0; i < tries; i++) {

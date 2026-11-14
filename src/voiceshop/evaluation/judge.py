@@ -146,13 +146,22 @@ def _post_json(url: str, body: dict[str, Any], headers: dict[str, str], timeout_
         url, data=json.dumps(body).encode("utf-8"), method="POST",
         headers={"Content-Type": "application/json", **headers},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as r:  # noqa: S310
-            return json.loads(r.read())
-    except urllib.error.HTTPError as exc:
-        raise JudgeError(f"judge backend returned HTTP {exc.code}") from None
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise JudgeError(f"judge backend unreachable ({type(exc).__name__})") from None
+    last: Exception | None = None
+    for attempt in range(4):  # back off on rate limits and temporary server errors only
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_s) as r:  # noqa: S310
+                return json.loads(r.read())
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 500, 503):
+                raise JudgeError(f"judge backend returned HTTP {exc.code}") from None
+            last = exc
+            time.sleep(2 ** (attempt + 1))
+        except (urllib.error.URLError, TimeoutError) as exc:
+            last = exc
+            time.sleep(2 ** (attempt + 1))
+    code = getattr(last, "code", None)
+    raise JudgeError(f"judge backend unavailable after retries (HTTP {code})" if code
+                     else f"judge backend unavailable after retries ({type(last).__name__})")
 
 
 def make_backend(name: str, model: str | None) -> JudgeBackend:
@@ -208,7 +217,7 @@ def _summarise(rows: list[dict[str, Any]], scored: list[dict[str, Any]]) -> dict
             bucket[k] = round(bucket[k] / bucket["turns"], 2)
     return {
         "turns_judged": len(rows),
-        "parse_failures": len(rows) - len(scored),
+        "failures": len(rows) - len(scored),
         "accuracy": mean("accuracy"),
         "helpfulness": mean("helpfulness"),
         "tone": mean("tone"),
@@ -241,7 +250,7 @@ def calibrate(backend: JudgeBackend, items: list[dict[str, Any]], facts: str) ->
         "judge": {"backend": backend.name, "model": backend.model},
         "items": len(items),
         "agreement": round(agree / len(items), 4) if items else None,
-        "parse_failures": len(items) - len(scored),
+        "failures": len(items) - len(scored),
         "details": details,
     }
 

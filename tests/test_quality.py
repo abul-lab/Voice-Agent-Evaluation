@@ -178,7 +178,7 @@ def test_judge_report_scores_agent_turns_and_counts_parse_failures():
     report = {"runs": [{"scenario_id": "x", "conversation": conv}]}
     backend = _FakeBackend([GOOD, "garbage"])
     out = judge_report(report, backend, facts="Ridgeline $189")
-    assert out["summary"]["turns_judged"] == 2 and out["summary"]["parse_failures"] == 1
+    assert out["summary"]["turns_judged"] == 2 and out["summary"]["failures"] == 1
     assert out["summary"]["accuracy"] == 5.0
     assert out["summary"]["total_tokens"] == 15  # only the answered call reports tokens
     assert backend.calls == 2

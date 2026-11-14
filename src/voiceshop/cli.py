@@ -79,7 +79,7 @@ def _judge_command(args) -> int:
             write_json(args.out, result)
             s = result["summary"]
             print(f"judged {s['turns_judged']} agent replies with {backend.name}:{backend.model} "
-                  f"(parse failures {s['parse_failures']})")
+                  f"(failures {s['failures']})")
             print(f"accuracy {s['accuracy']}  helpfulness {s['helpfulness']}  tone {s['tone']}  "
                   f"invented facts {s['invented_facts']}")
             print(f"written to {args.out}")
@@ -87,7 +87,7 @@ def _judge_command(args) -> int:
         result = calibrate(backend, load_json(args.items)["items"], facts)
         write_json(args.out, result)
         print(f"calibration with {backend.name}:{backend.model}: agreement {result['agreement']} "
-              f"over {result['items']} items (parse failures {result['parse_failures']})")
+              f"over {result['items']} items (failures {result['failures']})")
         print(f"written to {args.out}")
         return 0
     except JudgeError as exc:

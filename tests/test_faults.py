@@ -150,3 +150,26 @@ def test_the_api_refuses_oversized_and_malformed_bodies_and_keeps_serving(ctx, t
         server.shutdown()
         server.server_close()
         app.close()
+
+
+def test_a_crashing_scenario_is_recorded_as_an_error_with_its_traceback(ctx, monkeypatch, caplog):
+    import logging
+
+    from voiceshop.catalog import multiagent
+    from voiceshop.catalog.storerun import load_store_scenarios, run_store_scenario
+    from voiceshop.catalog.model import Catalog
+    from voiceshop.catalog.shop import ShopSessions
+
+    catalog = Catalog.load(DATA)
+    store = StoreData(DATA)
+    scenario = load_store_scenarios(Path(__file__).resolve().parents[1] / "scenarios" / "store_scenarios.json")[0]
+
+    def boom(self, utterance):
+        raise RuntimeError("simulated router bug")
+
+    monkeypatch.setattr(multiagent.FrontDeskRouter, "respond", boom)
+    with caplog.at_level(logging.ERROR, logger="voiceshop.storerun"):
+        run = run_store_scenario(ctx, catalog, store, scenario, shops=ShopSessions())
+    assert run.error and "simulated router bug" in run.error  # recorded, not raised into the suite
+    failed = [r for r in caplog.records if r.name == "voiceshop.storerun" and r.exc_info]
+    assert failed, "the failure was logged with its traceback"

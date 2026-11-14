@@ -328,3 +328,14 @@ def test_the_configuration_report_never_shows_secret_values():
     text = json.dumps(shown)
     assert "super-secret-admin" not in text and "g-secret-1" not in text
     assert shown["shared_admin_key"] == "set" and shown["gemini_key"] == "set"
+
+
+def test_a_changed_model_or_falling_agreement_is_reported_as_drift():
+    from voiceshop.evaluation.judge import drift
+
+    base = {"judge": {"backend": "ollama", "model": "qwen2.5:7b"}, "agreement": 0.5, "items": 36, "failures": 0}
+    assert drift(base, dict(base)) == []
+    assert any("judge changed" in r for r in drift(base, {**base, "judge": {"backend": "ollama", "model": "qwen3:8b"}}))
+    assert any("agreement fell" in r for r in drift(base, {**base, "agreement": 0.3}))
+    assert drift(base, {**base, "agreement": 0.47}) == []  # within the tolerance
+    assert any("incomplete" in r for r in drift(base, {**base, "failures": 4}))

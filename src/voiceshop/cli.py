@@ -59,6 +59,10 @@ def _parser() -> argparse.ArgumentParser:
     j.add_argument("--out", type=Path, default=ROOT / "results" / "latest" / "judged.json")
     j.add_argument("--allow-partial", action="store_true", help="write the result even if some calls failed")
 
+    dr = sub.add_parser("judge-drift", help="compare a calibration with the accepted reference")
+    dr.add_argument("--reference", type=Path, default=ROOT / "tests" / "judge" / "reference.json")
+    dr.add_argument("--current", type=Path, required=True)
+
     c = sub.add_parser("calibrate", help="measure how often the judge agrees with the human labels")
     c.add_argument("--backend", choices=("ollama", "gemini"), default="ollama")
     c.add_argument("--model", default=None)
@@ -167,6 +171,19 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"PROBLEM: {issue}")
             print("configuration OK" if not issues else f"{len(issues)} problem(s) to fix before starting")
             return 0 if not issues else 2
+
+        if args.command == "judge-drift":
+            from voiceshop.evaluation.judge import drift
+            from voiceshop.evaluation.regression import load_json
+
+            reasons = drift(load_json(args.reference), load_json(args.current))
+            if not reasons:
+                print("no drift: the judge agrees with the reference as before")
+                return 0
+            print(f"judge drift: {len(reasons)} reason(s)")
+            for r in reasons:
+                print(f"  - {r}")
+            return 1
 
         if args.command == "prune":
             result = ctx_for_prune(settings, args.db).runs.prune_older_than(args.older_than_days, dry_run=args.dry_run)

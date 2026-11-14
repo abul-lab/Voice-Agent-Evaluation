@@ -274,3 +274,25 @@ def build_facts(catalog: Any, store: Any) -> str:
         lines.append(f"Order {o.id}: status {o.status}, total ${o.total}" + (", " + ", ".join(extra) if extra else "") + ".")
     lines.append(f"Saved delivery address: {SAVED_ADDRESS}. Test payment card: {TEST_CARD}.")
     return "\n".join(lines)
+
+
+DRIFT_TOLERANCE = 0.05  # agreement may fall by at most five points before it counts as drift
+
+
+def drift(reference: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    """Reasons the current calibration differs from the reference. An empty list means no drift.
+    A different model is always reported: a judge that changed silently is not the judge that was accepted."""
+    reasons: list[str] = []
+    ref_model = reference.get("judge", {})
+    cur_model = current.get("judge", {})
+    if ref_model.get("model") != cur_model.get("model") or ref_model.get("backend") != cur_model.get("backend"):
+        reasons.append(f"judge changed from {ref_model.get('backend')}:{ref_model.get('model')} "
+                       f"to {cur_model.get('backend')}:{cur_model.get('model')}")
+    if current.get("items") != reference.get("items"):
+        reasons.append(f"the calibration set changed ({reference.get('items')} to {current.get('items')} items)")
+    ref_a, cur_a = reference.get("agreement"), current.get("agreement")
+    if ref_a is not None and cur_a is not None and cur_a < ref_a - DRIFT_TOLERANCE:
+        reasons.append(f"agreement fell from {ref_a:.1%} to {cur_a:.1%}")
+    if current.get("failures"):
+        reasons.append(f"{current['failures']} judge calls failed, so this result is incomplete")
+    return reasons

@@ -255,6 +255,15 @@ def calibrate(backend: JudgeBackend, items: list[dict[str, Any]], facts: str) ->
     }
 
 
+def assert_complete(result: dict[str, Any]) -> None:
+    """A result with failed calls is not a result. Refuse to write it unless the caller accepts partial output."""
+    failed = result.get("failures", 0)
+    if failed:
+        total = result.get("items") or result.get("summary", {}).get("turns_judged", 0) + failed
+        raise JudgeError(f"{failed} of {total} judge calls failed; nothing was written. "
+                         "Fix the cause (for example a rate limit) and run again, or pass --allow-partial.")
+
+
 def build_facts(catalog: Any, store: Any) -> str:
     """The facts the shop publishes. The judge checks replies against these, and nothing else."""
     from voiceshop.catalog.multiagent import CARE_INFO

@@ -221,3 +221,18 @@ def test_laptop_speaker_is_wired_to_the_conversation(live):
     _, voice, _ = _get(base + "/voice.js")
     _, app_js, _ = _get(base + "/app.js")
     assert b"SpeakerVoice" in voice and b"SpeakerVoice.speakSegments" in app_js
+
+
+def test_a_running_suite_is_stopped_and_drained_on_shutdown(ctx):
+    app = MonitorApp(ctx, api_key=KEY, max_concurrent_runs=2, max_body_bytes=4096, store_bundle=_bundle())
+    app.try_acquire()
+    batch = app.submit_store_suite("smoke", pace_ms=150)
+    import time as _t
+
+    deadline = _t.monotonic() + 10
+    while app.metrics.active_runs == 0 and _t.monotonic() < deadline:
+        _t.sleep(0.02)
+    assert app.drain(timeout_s=20) is True
+    assert app.metrics.active_runs == 0
+    assert batch  # the suite was started and then stopped
+    app.close()

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import signal
 import sys
+import threading
 from pathlib import Path
 
 from voiceshop.catalog.model import Catalog
@@ -54,12 +56,14 @@ def _parser() -> argparse.ArgumentParser:
     j.add_argument("--model", default=None)
     j.add_argument("--report", type=Path, default=ROOT / "results" / "latest" / "report.json")
     j.add_argument("--out", type=Path, default=ROOT / "results" / "latest" / "judged.json")
+    j.add_argument("--allow-partial", action="store_true", help="write the result even if some calls failed")
 
     c = sub.add_parser("calibrate", help="measure how often the judge agrees with the human labels")
     c.add_argument("--backend", choices=("ollama", "gemini"), default="ollama")
     c.add_argument("--model", default=None)
     c.add_argument("--items", type=Path, default=ROOT / "tests" / "judge" / "calibration.json")
     c.add_argument("--out", type=Path, default=ROOT / "results" / "judge" / "calibration.json")
+    c.add_argument("--allow-partial", action="store_true", help="write the result even if some calls failed")
 
     v = sub.add_parser("serve", help="start the live monitor and storefront")
     v.add_argument("--host", default="127.0.0.1")
@@ -68,7 +72,14 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _judge_command(args) -> int:
-    from voiceshop.evaluation.judge import JudgeError, build_facts, calibrate, judge_report, make_backend
+    from voiceshop.evaluation.judge import (
+        JudgeError,
+        assert_complete,
+        build_facts,
+        calibrate,
+        judge_report,
+        make_backend,
+    )
     from voiceshop.evaluation.regression import load_json, write_json
 
     backend = make_backend(args.backend, args.model)
@@ -76,6 +87,8 @@ def _judge_command(args) -> int:
     try:
         if args.command == "judge":
             result = judge_report(load_json(args.report), backend, facts)
+            if not args.allow_partial:
+                assert_complete(result)
             write_json(args.out, result)
             s = result["summary"]
             print(f"judged {s['turns_judged']} agent replies with {backend.name}:{backend.model} "
@@ -85,6 +98,8 @@ def _judge_command(args) -> int:
             print(f"written to {args.out}")
             return 0
         result = calibrate(backend, load_json(args.items)["items"], facts)
+        if not args.allow_partial:
+            assert_complete(result)
         write_json(args.out, result)
         print(f"calibration with {backend.name}:{backend.model}: agreement {result['agreement']} "
               f"over {result['items']} items (failures {result['failures']})")
@@ -149,8 +164,11 @@ def main(argv: list[str] | None = None) -> int:
                 "catalog": catalog,
                 "store": store,
                 "scenarios": load_store_scenarios(SCENARIOS_PATH),
-                "shops": ShopSessions(),  # one storefront session store, shared by the monitor and the shop page
+                "shops": ShopSessions(ctx.db_path),  # durable storefront sessions, shared by the monitor and the shop page
             }
+            interrupted = ctx.runs.reconcile_interrupted()
+            if interrupted:
+                log.warning("runs interrupted by a previous stop were marked as errors", extra={"count": interrupted})
             app = MonitorApp(
                 ctx,
                 api_key=settings.api_key,
@@ -161,15 +179,26 @@ def main(argv: list[str] | None = None) -> int:
                 settings_path=settings.db_path.parent / "monitor_settings.json",
             )
             server = make_server(app, args.host, args.port)
+
+            def _stop(signum, _frame):  # stop taking requests; the drain happens below, on the main thread
+                log.info("stop requested", extra={"signal": signum})
+                threading.Thread(target=server.shutdown, daemon=True).start()
+
+            signal.signal(signal.SIGINT, _stop)
+            if hasattr(signal, "SIGTERM"):
+                signal.signal(signal.SIGTERM, _stop)
             print(f"monitor on http://{args.host}:{args.port}  "
                   f"(mutating API {'enabled' if app.api_key else 'disabled'})")
             try:
                 server.serve_forever()
-            except KeyboardInterrupt:
-                pass
             finally:
+                clean = app.drain(timeout_s=30.0)
+                if not clean:
+                    log.warning("some runs did not stop within 30 seconds")
                 server.server_close()
                 app.close()
+                ctx.runs.reconcile_interrupted()  # anything still marked running is recorded as interrupted
+                log.info("stopped", extra={"clean": clean})
             return 0
     except VoiceShopError as exc:
         print(f"error [{exc.code}]: {exc}", file=sys.stderr)

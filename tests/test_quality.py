@@ -234,3 +234,22 @@ def test_an_existing_version_1_database_is_upgraded_in_place(tmp_path):
     cols = {row[1] for row in conn.execute("PRAGMA table_info(turns)")}
     conn.close()
     assert "stages" in cols
+
+
+def test_runs_left_running_by_a_crash_are_marked_as_interrupted_at_start_up(ctx):
+    ctx.runs.create("crashed-1", "store_order_status_shipped", "rules", "test", None)
+    ctx.runs.create("finished-1", "store_order_status_shipped", "rules", "test", None)
+    ctx.runs.finish("finished-1", "passed", {"passed": True})
+    assert ctx.runs.reconcile_interrupted() == 1
+    crashed = ctx.runs.get("crashed-1")
+    assert crashed["status"] == "error" and crashed["summary"]["error"] == "interrupted"
+    assert ctx.runs.get("finished-1")["status"] == "passed"  # finished runs are left alone
+
+
+def test_a_judge_result_with_failed_calls_is_not_written_unless_partial_is_allowed():
+    from voiceshop.evaluation.judge import assert_complete
+
+    assert_complete({"failures": 0, "items": 3})  # complete: fine
+    with pytest.raises(JudgeError) as err:
+        assert_complete({"failures": 2, "items": 36})
+    assert "nothing was written" in str(err.value)

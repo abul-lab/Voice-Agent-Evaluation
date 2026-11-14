@@ -139,3 +139,49 @@ def test_takeover_and_resume_over_http(live_shop):
     _act(live_shop, {"sid": sid, "action": "resume"})
     _, snap = _get(f"{live_shop}/shop/api/state?sid={sid}")
     assert snap["mode"] == "voice"
+
+
+def test_a_storefront_cart_survives_a_restart(tmp_path, catalog):
+    from voiceshop.catalog.shop import ShopSessions
+
+    db = tmp_path / "shop.db"
+    from voiceshop.storage.db import migrate
+
+    migrate(db)
+    first = ShopSessions(db)
+    _mutate(first, catalog, "durable-1", lambda s: sh.op_add(s, catalog, "tent-01"))
+    second = ShopSessions(db)  # a new process reading the same database
+    snap = second.snapshot("durable-1", catalog)
+    assert snap["cart_count"] == 1 and snap["cart"][0]["id"] == "tent-01"
+    assert snap["version"] == first.snapshot("durable-1", catalog)["version"]
+
+
+def test_storefront_sessions_expire_after_the_time_to_live(tmp_path, catalog):
+    import time as _t
+
+    from voiceshop.catalog.shop import ShopSessions
+    from voiceshop.storage.db import migrate
+    from voiceshop.storage.db import session as db_session
+
+    db = tmp_path / "shop.db"
+    migrate(db)
+    shops = ShopSessions(db, ttl_s=3600)
+    shops.session("old-1")
+    shops.session("old-2")
+    removed = shops.evict_expired(now=_t.time() + 3601)
+    assert removed == 2
+    with db_session(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM shop_sessions").fetchone()[0] == 0
+
+
+def test_the_memory_cache_is_bounded_but_sessions_are_still_there(tmp_path, catalog):
+    from voiceshop.catalog.shop import ShopSessions
+    from voiceshop.storage.db import migrate
+
+    db = tmp_path / "shop.db"
+    migrate(db)
+    shops = ShopSessions(db, max_cached=2)
+    for i in range(5):
+        _mutate(shops, catalog, f"cache-{i}", lambda s: sh.op_add(s, catalog, "tent-01"))
+    assert len(shops._sessions) <= 2
+    assert shops.snapshot("cache-0", catalog)["cart_count"] == 1  # reloaded from the database

@@ -13,10 +13,13 @@ Rules enforced here, not in the UI:
 from __future__ import annotations
 
 import itertools
+import json
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from voiceshop.catalog.model import Catalog, Product
@@ -51,23 +54,79 @@ class ShopSession:
 
 
 class ShopSessions:
+    """Storefront sessions. With a database path they survive restarts: every change is saved, sessions
+    untouched for ``ttl_s`` seconds are removed, and only ``max_cached`` sessions are kept in memory.
+    Without a path they live in memory only (used by scenario runs, which are sandboxes)."""
+
     MAX_EVENTS = 80
     MAX_HISTORY = 400
+    DEFAULT_TTL_S = 24 * 3600
 
-    def __init__(self) -> None:
+    def __init__(self, db_path: Path | None = None, *, ttl_s: float = DEFAULT_TTL_S, max_cached: int = 500) -> None:
         self._cond = threading.Condition()
-        self._sessions: dict[str, ShopSession] = {}
+        self._db = db_path
+        self._ttl = ttl_s
+        self._max_cached = max_cached
+        self._sessions: OrderedDict[str, ShopSession] = OrderedDict()
+        self._writes_since_evict = 0
 
     def session(self, sid: str) -> ShopSession:
         with self._cond:
             return self._get(sid)
 
     def _get(self, sid: str) -> ShopSession:
-        if sid not in self._sessions:
-            fresh = ShopSession(sid=sid)
-            fresh.history.append(_snap(fresh))
-            self._sessions[sid] = fresh
-        return self._sessions[sid]
+        if sid in self._sessions:
+            self._sessions.move_to_end(sid)
+            return self._sessions[sid]
+        loaded = self._load(sid)
+        if loaded is None:
+            loaded = ShopSession(sid=sid)
+            loaded.history.append(_snap(loaded))
+            self._save(loaded)
+        self._sessions[sid] = loaded
+        while len(self._sessions) > self._max_cached:
+            self._sessions.popitem(last=False)  # least recently used; the database still has it
+        return loaded
+
+    # ------------------------------------------------------------ persistence
+    def _load(self, sid: str) -> ShopSession | None:
+        if self._db is None:
+            return None
+        from voiceshop.storage.db import session as db_session
+
+        with db_session(self._db) as conn:
+            row = conn.execute("SELECT state FROM shop_sessions WHERE sid=?", (sid,)).fetchone()
+        if row is None:
+            return None
+        data = json.loads(row["state"])
+        return ShopSession(**data)
+
+    def _save(self, s: ShopSession) -> None:
+        if self._db is None:
+            return
+        from voiceshop.storage.db import session as db_session
+
+        state = json.dumps(asdict(s), default=str)
+        with db_session(self._db) as conn:
+            conn.execute(
+                "INSERT INTO shop_sessions (sid, state, updated_at) VALUES (?,?,?) "
+                "ON CONFLICT(sid) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at",
+                (s.sid, state, time.time()),
+            )
+
+    def evict_expired(self, now: float | None = None) -> int:
+        """Remove sessions untouched for longer than the time-to-live. Returns how many were removed."""
+        if self._db is None:
+            return 0
+        from voiceshop.storage.db import session as db_session
+
+        cutoff = (now if now is not None else time.time()) - self._ttl
+        with self._cond:
+            with db_session(self._db) as conn:
+                removed = conn.execute("DELETE FROM shop_sessions WHERE updated_at < ?", (cutoff,)).rowcount
+            for sid in [k for k, v in self._sessions.items() if v.created < cutoff]:
+                self._sessions.pop(sid, None)
+        return removed
 
     def mutate(self, sid: str, catalog: Catalog, fn: Callable[[ShopSession], Any], *, actor: str,
                action: str, detail: dict[str, Any] | None = None) -> Any:
@@ -81,6 +140,11 @@ class ShopSessions:
             s.events.append({"n": s.version, "ts": time.strftime("%H:%M:%S"), "actor": actor,
                              "action": action, "detail": detail or {}})
             del s.events[:-self.MAX_EVENTS]
+            self._save(s)
+            self._writes_since_evict += 1
+            if self._writes_since_evict >= 200:  # housekeeping every so often, not on every change
+                self._writes_since_evict = 0
+                self.evict_expired()
             self._cond.notify_all()
             return result
 

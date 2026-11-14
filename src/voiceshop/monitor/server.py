@@ -224,6 +224,16 @@ class MonitorApp:
         self._pool.submit(job)
         return batch_id
 
+    def drain(self, timeout_s: float = 30.0) -> bool:
+        """Stop the work in progress: ask every running suite to stop, then wait up to ``timeout_s`` for them.
+        Returns True when nothing is left running."""
+        for event in list(self._cancels.values()):
+            event.set()
+        deadline = _time.monotonic() + timeout_s
+        while self.metrics.active_runs > 0 and _time.monotonic() < deadline:
+            _time.sleep(0.05)
+        return self.metrics.active_runs == 0
+
     def close(self) -> None:
         self._pool.shutdown(wait=False, cancel_futures=True)
 

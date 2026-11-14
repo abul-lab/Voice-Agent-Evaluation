@@ -160,6 +160,23 @@ class RunRepository:
                 raise
         return n
 
+    def reconcile_interrupted(self) -> int:
+        """At start-up no suite is running in this process, so any run still marked running was cut off by a
+        crash or a stop. Mark those as errors so the monitor never shows work that has stopped. Returns the count."""
+        with session(self._db) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                rows = conn.execute("SELECT id FROM runs WHERE status='running'").fetchall()
+                conn.execute(
+                    "UPDATE runs SET status='error', finished_at=?, summary=? WHERE status='running'",
+                    (_now(), json.dumps({"error": "interrupted", "detail": "the server stopped before this run finished"})),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        return len(rows)
+
     def running_count(self) -> int:
         with session(self._db) as conn:
             return conn.execute("SELECT COUNT(*) FROM runs WHERE status='running'").fetchone()[0]

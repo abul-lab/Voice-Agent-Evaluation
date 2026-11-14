@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _MIGRATIONS: dict[int, list[str]] = {
     1: [
@@ -78,6 +78,17 @@ _MIGRATIONS: dict[int, list[str]] = {
             PRIMARY KEY (scope, order_id)
         )
         """,
+    ],
+    4: [
+        # Storefront sessions (cart, orders, history), saved as JSON after every change.
+        """
+        CREATE TABLE IF NOT EXISTS shop_sessions (
+            sid        TEXT PRIMARY KEY,
+            state      TEXT NOT NULL,
+            updated_at REAL NOT NULL
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_shop_sessions_updated ON shop_sessions (updated_at)",
     ],
 }
 

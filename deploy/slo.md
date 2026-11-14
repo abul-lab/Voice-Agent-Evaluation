@@ -15,8 +15,9 @@ These are starting targets. The QE lead and the operations owner set the final v
 
 ## Alert conditions
 
-These expressions are written for a Prometheus-style system. They have **not** been run against a Prometheus server
-yet; check them there before relying on them.
+The rules are in `deploy/prometheus/alerts.yml`. `promtool check rules` passes (checked with Prometheus 3, 2026-11-14).
+The readiness alert also needs a blackbox exporter; the example scrape configuration is `deploy/prometheus/prometheus.yml`.
+The rules have not yet been run against live data.
 
 | Alert | Condition | Severity |
 |---|---|---|
@@ -26,7 +27,6 @@ yet; check them there before relying on them.
 | Monitor not ready | `/readyz` failing for 3 minutes | critical |
 | Server errors | `rate(voiceshop_http_requests_total{code=~"5.."}[5m]) > 0` | warning |
 | Suites refused because busy | `rate(voiceshop_runs_rejected_total[15m]) > 0` | warning |
-| Runs left running | `voiceshop_active_runs > 0` after a restart | investigate |
 
 ## What to do when an alert fires
 

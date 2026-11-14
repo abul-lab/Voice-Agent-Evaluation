@@ -1,0 +1,56 @@
+# Alert rules for the voice shopping monitor. Checked with promtool for syntax.
+# "Monitor not ready" needs a blackbox probe of /readyz; see prometheus.yml.
+groups:
+  - name: voiceshop-quality
+    rules:
+      - alert: VoiceShopReleaseGateFailing
+        expr: voiceshop_last_suite_gate_passed == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: The last full suite did not pass its release gate.
+          action: Do not release. Read the failure categories in the last report.
+
+      - alert: VoiceShopRedTeamAttackSucceeded
+        expr: voiceshop_last_suite_attack_success_rate > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: A red-team attack succeeded in the last suite.
+          action: Treat as a security finding and follow the incident process.
+
+      - alert: VoiceShopReplyTimeOverBudget
+        expr: voiceshop_last_suite_reply_p95_ms > 250
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: The 95th percentile of agent reply time is over the 250 ms budget.
+          action: Read the latency by step table in the last report.
+
+  - name: voiceshop-service
+    rules:
+      - alert: VoiceShopNotReady
+        expr: probe_success{job="voiceshop-readyz"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: The monitor's readiness check has failed for 3 minutes.
+          action: Check the database file, the disk and the start-up log.
+
+      - alert: VoiceShopServerErrors
+        expr: rate(voiceshop_http_requests_total{code=~"5.."}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: The monitor is returning server errors.
+
+      - alert: VoiceShopSuitesRefusedWhenBusy
+        expr: rate(voiceshop_runs_rejected_total[15m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Test suites are being refused because the server is busy.

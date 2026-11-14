@@ -1,0 +1,17 @@
+# Example scrape configuration. Replace the targets with your monitor's address.
+global:
+  scrape_interval: 30s
+rule_files:
+  - alerts.yml
+scrape_configs:
+  - job_name: voiceshop
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voiceshop:8765"]
+  - job_name: voiceshop-readyz
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+      target: ["http://voiceshop:8765/readyz"]
+    static_configs:
+      - targets: ["blackbox-exporter:9115"]

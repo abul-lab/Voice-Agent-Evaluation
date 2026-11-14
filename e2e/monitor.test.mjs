@@ -131,3 +131,13 @@ test('a finished run shows the time spent on each step', async () => {
   assert.deepEqual(p.errors, [], 'no uncaught page errors');
   await p.close();
 });
+
+test('the agent strip stays visible at the bottom of the monitor after a run is opened', async () => {
+  const p = await page();
+  await p.goto(`${base}/`);
+  await p.waitForSelector('#roster .agent-card');
+  const hidden = await p.evaluate(() => getComputedStyle(document.getElementById('roster')).display === 'none');
+  assert.equal(hidden, false, 'the roster is not hidden');
+  assert.equal(await p.locator('#roster .agent-card').count(), 5, 'all five agents are shown');
+  await p.close();
+});

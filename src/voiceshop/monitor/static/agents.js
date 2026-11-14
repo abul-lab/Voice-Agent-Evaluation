@@ -520,7 +520,8 @@ const HOP_FAST_MS = 170;  // used when messages arrive faster than they can be d
       n.satItems = [];
       n.bubble.setAttribute("opacity", "0");
     }
-    setMode(run && run.source === "store" ? "multi" : "single");
+    // Every run is a store run now. The run source is the caller's name, so it cannot say which view to use.
+    setMode("multi");
     buildLanes();
     renderStats();
     if (state.mode === "multi") renderRoster();

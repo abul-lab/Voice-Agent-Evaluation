@@ -1,0 +1,16 @@
+# Adds the TLS proxy in front of the monitor. Use with the main compose file:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.proxy.yml up -d
+services:
+  caddy:
+    image: caddy:2
+    depends_on:
+      - voiceshop
+    ports:
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./deploy/Caddyfile.compose:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    restart: unless-stopped
+
+volumes:
+  caddy-data:

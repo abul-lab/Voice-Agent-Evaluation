@@ -223,7 +223,7 @@ voiceshop prune --older-than-days 90 --dry-run
 voiceshop prune --older-than-days 90
 ```
 
-**Containers and TLS.** `Dockerfile`, `docker-compose.yml` and `deploy/Caddyfile` are included. The monitor listens
+**Containers and TLS.** `Dockerfile`, `docker-compose.yml`, and the TLS proxy (`deploy/docker-compose.proxy.yml` with `deploy/Caddyfile.compose`) are included. The whole stack was started and tested through the proxy on 2026-11-14 (health, authentication, security headers). For a public site, replace `localhost` in `deploy/Caddyfile.compose` with your domain name. `deploy/Caddyfile` is the version for a proxy running on the host rather than in a container. The monitor listens
 on loopback behind a TLS proxy. Set `VOICESHOP_TRUST_PROXY=1` only when the proxy adds `X-Forwarded-For`.
 See `.env.example` for the variables.
 

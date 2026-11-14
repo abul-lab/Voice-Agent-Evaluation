@@ -1,0 +1,14 @@
+# TLS proxy for the Docker Compose stack. The monitor is reached by its service name on the compose network,
+# not by 127.0.0.1 (inside the proxy container, 127.0.0.1 would be the proxy itself).
+# For a public site, replace "localhost" with your domain name: Caddy then obtains a certificate automatically.
+# The "tls internal" line makes Caddy issue a local certificate, for testing only.
+localhost:443 {
+    tls internal
+    encode gzip
+    reverse_proxy voiceshop:8765
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+}

@@ -5,6 +5,9 @@ services:
     build: .
     env_file: .env
     environment:
+      # These take precedence over .env: the container keeps its data in the volume.
+      VOICESHOP_DB: /data/voiceshop.db
+      VOICESHOP_KEYS_FILE: /data/api_keys.json
       VOICESHOP_TRUST_PROXY: "1"   # the proxy adds X-Forwarded-For; per-client limits use it
     ports:
       - "127.0.0.1:8765:8765"

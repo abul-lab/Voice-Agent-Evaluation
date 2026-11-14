@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from voiceshop.storage.db import session
+from voiceshop.storage.db import session, transaction
 
 
 def _now() -> str:
@@ -51,25 +51,18 @@ class RefundLedger:
 
     def issue(self, scope: str, order_id: str, amount: int, policy_version: str, actor: str) -> tuple[dict[str, Any], bool]:
         """Returns (record, duplicate). The first call approves; later calls return the original record."""
-        with session(self._db) as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                row = conn.execute("SELECT * FROM refunds WHERE scope=? AND order_id=?", (scope, order_id)).fetchone()
-                if row is not None:
-                    conn.execute("COMMIT")
-                    return dict(row), True
-                record = {"scope": scope, "order_id": order_id, "amount": amount,
-                          "policy_version": policy_version, "status": "approved", "actor": actor, "created_at": _now()}
-                conn.execute(
-                    "INSERT INTO refunds (scope, order_id, amount, policy_version, status, actor, created_at) "
-                    "VALUES (?,?,?,?,?,?,?)",
-                    (scope, order_id, amount, policy_version, "approved", actor, record["created_at"]),
-                )
-                conn.execute("COMMIT")
-                return record, False
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+        with session(self._db) as conn, transaction(conn):
+            row = conn.execute("SELECT * FROM refunds WHERE scope=? AND order_id=?", (scope, order_id)).fetchone()
+            if row is not None:
+                return dict(row), True
+            record = {"scope": scope, "order_id": order_id, "amount": amount,
+                      "policy_version": policy_version, "status": "approved", "actor": actor, "created_at": _now()}
+            conn.execute(
+                "INSERT INTO refunds (scope, order_id, amount, policy_version, status, actor, created_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (scope, order_id, amount, policy_version, "approved", actor, record["created_at"]),
+            )
+            return record, False
 
     def get(self, scope: str, order_id: str) -> dict[str, Any] | None:
         with session(self._db) as conn:
@@ -148,16 +141,10 @@ class RunRepository:
     def clear(self) -> int:
         """Delete all run records and their turns. Returns the number of runs removed.
         The audit trail is not touched: it is a compliance record, not a view of history."""
-        with session(self._db) as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                n = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
-                conn.execute("DELETE FROM turns")
-                conn.execute("DELETE FROM runs")
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+        with session(self._db) as conn, transaction(conn):
+            n = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+            conn.execute("DELETE FROM turns")
+            conn.execute("DELETE FROM runs")
         return n
 
     def prune_older_than(self, days: int, *, dry_run: bool = False) -> dict[str, int]:
@@ -173,30 +160,19 @@ class RunRepository:
                 "SELECT COUNT(*) FROM turns WHERE run_id IN (SELECT id FROM runs WHERE created_at < ? "
                 "AND status != 'running')", (cutoff,)).fetchone()[0]
             if not dry_run and runs:
-                conn.execute("BEGIN IMMEDIATE")
-                try:
+                with transaction(conn):
                     conn.execute("DELETE FROM runs WHERE created_at < ? AND status != 'running'", (cutoff,))
-                    conn.execute("COMMIT")
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    raise
         return {"runs": runs, "turns": turns, "cutoff": cutoff}
 
     def reconcile_interrupted(self) -> int:
         """At start-up no suite is running in this process, so any run still marked running was cut off by a
         crash or a stop. Mark those as errors so the monitor never shows work that has stopped. Returns the count."""
-        with session(self._db) as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                rows = conn.execute("SELECT id FROM runs WHERE status='running'").fetchall()
-                conn.execute(
-                    "UPDATE runs SET status='error', finished_at=?, summary=? WHERE status='running'",
-                    (_now(), json.dumps({"error": "interrupted", "detail": "the server stopped before this run finished"})),
-                )
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+        with session(self._db) as conn, transaction(conn):
+            rows = conn.execute("SELECT id FROM runs WHERE status='running'").fetchall()
+            conn.execute(
+                "UPDATE runs SET status='error', finished_at=?, summary=? WHERE status='running'",
+                (_now(), json.dumps({"error": "interrupted", "detail": "the server stopped before this run finished"})),
+            )
         return len(rows)
 
     def running_count(self) -> int:

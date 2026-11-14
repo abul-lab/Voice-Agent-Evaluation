@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
 import threading
 import time as _time
 import uuid
@@ -479,7 +480,7 @@ class _Handler(ShopRoutes, BaseHTTPRequestHandler):
         try:
             self.app.ctx.runs.counts()
             ok, detail = True, {"schema_version": SCHEMA_VERSION}
-        except Exception as exc:  # readiness must report, not crash
+        except (sqlite3.Error, OSError) as exc:  # readiness reports a database problem instead of crashing
             ok, detail = False, {"error": type(exc).__name__}
         self._json(200 if ok else 503, {"status": "ready" if ok else "not_ready", **detail}, "/readyz")
 

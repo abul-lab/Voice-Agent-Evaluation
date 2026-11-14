@@ -7,6 +7,7 @@ the agent's own claims.
 from __future__ import annotations
 
 import json
+import logging
 import random
 import re
 import time as _clock
@@ -29,6 +30,7 @@ from voiceshop.evaluation.invariants import dialogue_violations
 from voiceshop.simulation.asr import AsrNoise
 from voiceshop.simulation.conversation import TurnRecord, run_conversation
 
+log = logging.getLogger("voiceshop.storerun")
 DISCLOSING = {"order_status", "refund_approved", "refund_refused"}
 VERIFICATION_ACTS = {"ask_order", "ask_email", "verify_failed"}
 SEASON_TEXT = {"winter": 4, "summer": 2, "three season": 3, "spring": 3, "autumn": 3}
@@ -144,8 +146,9 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
     try:
         result = run_conversation(conductor, caller, asr, max_turns=scenario.max_turns, on_turn=emit)
         end_reason = result.end_reason
-    except Exception as exc:  # recorded as a run error, never raised into the monitor
+    except Exception as exc:  # isolation boundary: the run is recorded as an error, the suite carries on
         error = f"{type(exc).__name__}: {exc}"
+        log.exception("scenario failed", extra={"run_id": run_id, "scenario_id": scenario.id})
     wall = round((_clock.perf_counter() - started) * 1000, 1)
     snap = shops.snapshot(run_id, catalog)
     shop_state = {"orders": snap["orders"], "cart": {line["id"]: line["qty"] for line in snap["cart"]},

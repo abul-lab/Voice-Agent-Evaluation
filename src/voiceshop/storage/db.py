@@ -124,6 +124,19 @@ def session(path: str | Path) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+@contextmanager
+def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+    """BEGIN IMMEDIATE, then COMMIT on success or ROLLBACK on any error (the error is re-raised)."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield conn
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    else:
+        conn.execute("COMMIT")
+
+
 def migrate(path: str | Path) -> int:
     """Create the schema if needed. Idempotent; returns the schema version."""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -134,13 +147,8 @@ def migrate(path: str | Path) -> int:
             raise RuntimeError(f"database schema {current} is newer than this code ({SCHEMA_VERSION}); "
                                "point VOICESHOP_DB at a new file")
         for version in range(current + 1, SCHEMA_VERSION + 1):
-            conn.execute("BEGIN IMMEDIATE")
-            try:
+            with transaction(conn):
                 for stmt in _MIGRATIONS[version]:
                     conn.execute(stmt)
                 conn.execute(f"PRAGMA user_version = {int(version)}")
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
         return conn.execute("PRAGMA user_version").fetchone()[0]

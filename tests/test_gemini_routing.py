@@ -134,3 +134,19 @@ def test_routing_waits_are_short_and_bounded(monkeypatch):
     monkeypatch.setattr(route_gemini, "post_json", fake_post)
     assert GeminiRouteClassifier("fake-key").classify("I want to complain") == "care"
     assert seen["timeout_s"] <= 15 and seen["attempts"] <= 2  # a slow model cannot hold a run for minutes
+
+
+def test_an_unavailable_router_fails_the_suite_gate_and_is_never_a_pass(ctx):
+    from voiceshop.catalog.storerun import load_store_scenarios, run_store_suite
+
+    class Down:
+        def classify(self, utterance):
+            raise ServiceError("service unavailable after 2 attempts (HTTP 503)")
+
+    scenarios = load_store_scenarios(ROOT / "scenarios" / "store_scenarios.json")
+    smoke = [s for s in scenarios if "smoke" in s.tags]
+    report = run_store_suite(ctx, Catalog.load(DATA), StoreData(DATA), smoke, threshold=0.9,
+                             tags=None, mode="gemini", classifier=Down(), shops=ShopSessions())
+    summary = report["summary"]
+    assert summary["errors"] == 1 and summary["passed"] == 0
+    assert summary["gate_passed"] is False  # an error is never a pass, so the release gate fails

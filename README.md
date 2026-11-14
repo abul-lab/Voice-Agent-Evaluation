@@ -94,7 +94,7 @@ Checks read the transcript, the audit log and the store data. An agent's own sta
 | LLM judge | rubric scores for accuracy, helpfulness and tone, and whether a reply invents facts | `voiceshop judge` |
 | Judge calibration | how often the judge agrees with human labels | `voiceshop calibrate` |
 
-**The judge is not yet trusted.** Its calibration labels in `tests/judge/calibration.json` were written by the repository author and must be replaced by the QE team's labels. Until a calibration agreement has been accepted, judge scores are information, not a gate.
+**The judge is not yet trusted.** The calibration set in `tests/judge/calibration.json` holds 36 agent replies sampled from the clean regression run. The labels were written by the repository author as interim labels, with one rater and no review; each item has a note explaining the decision. The QE team should replace them with their own labels. Until a calibration agreement has been accepted, judge scores are information, not a gate.
 
 The judge runs on a local model (Ollama) for plumbing and integration checks. The Gemini backend exists, but it is not part of any run until the team approves a judged run, because each call has a cost.
 

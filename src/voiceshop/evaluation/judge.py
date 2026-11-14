@@ -249,6 +249,7 @@ def calibrate(backend: JudgeBackend, items: list[dict[str, Any]], facts: str) ->
 def build_facts(catalog: Any, store: Any) -> str:
     """The facts the shop publishes. The judge checks replies against these, and nothing else."""
     from voiceshop.catalog.multiagent import CARE_INFO
+    from voiceshop.catalog.shop import SAVED_ADDRESS, TEST_CARD
 
     lines = [
         f"Shop: {catalog.store_name}.",
@@ -258,7 +259,16 @@ def build_facts(catalog: Any, store: Any) -> str:
     ]
     for p in catalog.products.values():
         stock = "in stock" if p.stock > 0 else "out of stock"
-        lines.append(f"Product: {p.name}, ${p.price}, {stock}.")
+        sleeps = f", sleeps {p.capacity}" if p.category == "tent" else ""
+        lines.append(f"Product: {p.name}, ${p.price}, {stock}{sleeps}.")
     for o in store.orders.values():
-        lines.append(f"Order {o.id}: status {o.status}, total ${o.total}.")
+        extra = []
+        if o.tracking:
+            extra.append(f"tracking {o.tracking}")
+        if o.eta:
+            extra.append(f"due {o.eta:%B} {o.eta.day}")
+        if o.delivered_on:
+            extra.append(f"delivered {o.delivered_on:%B} {o.delivered_on.day}")
+        lines.append(f"Order {o.id}: status {o.status}, total ${o.total}" + (", " + ", ".join(extra) if extra else "") + ".")
+    lines.append(f"Saved delivery address: {SAVED_ADDRESS}. Test payment card: {TEST_CARD}.")
     return "\n".join(lines)

@@ -66,6 +66,10 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("--out", type=Path, default=ROOT / "results" / "judge" / "calibration.json")
     c.add_argument("--allow-partial", action="store_true", help="write the result even if some calls failed")
 
+    pr = sub.add_parser("prune", help="delete run transcripts older than a number of days (the audit trail is kept)")
+    pr.add_argument("--older-than-days", type=int, required=True)
+    pr.add_argument("--dry-run", action="store_true", help="show what would be removed, remove nothing")
+
     k = sub.add_parser("keys", help="manage named API keys (the key is shown once, only its hash is stored)")
     ks = k.add_subparsers(dest="keys_command", required=True)
     kc = ks.add_parser("create", help="create a key with a role")
@@ -79,6 +83,12 @@ def _parser() -> argparse.ArgumentParser:
     v.add_argument("--host", default="127.0.0.1")
     v.add_argument("--port", type=int, default=8765)
     return p
+
+
+def ctx_for_prune(settings, db):
+    from voiceshop.context import build_context as _bc
+
+    return _bc(settings, db)
 
 
 def _judge_command(args) -> int:
@@ -132,6 +142,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command in ("judge", "calibrate"):
             return _judge_command(args)
+
+        if args.command == "prune":
+            result = ctx_for_prune(settings, args.db).runs.prune_older_than(args.older_than_days, dry_run=args.dry_run)
+            verb = "would remove" if args.dry_run else "removed"
+            print(f"{verb} {result['runs']} runs and {result['turns']} turns older than {result['cutoff']}")
+            return 0
 
         if args.command == "keys":
             path = settings.keys_file

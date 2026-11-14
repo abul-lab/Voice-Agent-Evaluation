@@ -160,6 +160,28 @@ class RunRepository:
                 raise
         return n
 
+    def prune_older_than(self, days: int, *, dry_run: bool = False) -> dict[str, int]:
+        """Delete run transcripts older than ``days``. The audit trail is never removed (it is a record of
+        what happened, kept under its own policy). Returns how many runs and turns were, or would be, removed."""
+        from datetime import timedelta
+
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        with session(self._db) as conn:
+            runs = conn.execute("SELECT COUNT(*) FROM runs WHERE created_at < ? AND status != 'running'",
+                                (cutoff,)).fetchone()[0]
+            turns = conn.execute(
+                "SELECT COUNT(*) FROM turns WHERE run_id IN (SELECT id FROM runs WHERE created_at < ? "
+                "AND status != 'running')", (cutoff,)).fetchone()[0]
+            if not dry_run and runs:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    conn.execute("DELETE FROM runs WHERE created_at < ? AND status != 'running'", (cutoff,))
+                    conn.execute("COMMIT")
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+        return {"runs": runs, "turns": turns, "cutoff": cutoff}
+
     def reconcile_interrupted(self) -> int:
         """At start-up no suite is running in this process, so any run still marked running was cut off by a
         crash or a stop. Mark those as errors so the monitor never shows work that has stopped. Returns the count."""

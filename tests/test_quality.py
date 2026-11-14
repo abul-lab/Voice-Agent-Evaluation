@@ -265,3 +265,44 @@ def test_the_token_bucket_allows_a_burst_then_refuses_until_refilled():
     assert bucket.allow("alice", now=0.0) is False  # burst used up
     assert bucket.allow("bob", now=0.0)  # other callers are not affected
     assert bucket.allow("alice", now=31.0)  # half a minute later one more request is allowed
+
+
+def test_logs_never_carry_customer_emails_even_in_extra_fields_or_exceptions():
+    import io
+    import logging
+
+    from voiceshop.logging_utils import JsonFormatter, RedactionFilter
+
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setFormatter(JsonFormatter())
+    handler.addFilter(RedactionFilter())
+    log = logging.getLogger("test.redaction")
+    log.handlers[:] = [handler]
+    log.propagate = False
+    log.setLevel(logging.INFO)
+    log.info("refund asked by maria.lopez@example.com", extra={"detail": {"email": "maria.lopez@example.com"}})
+    try:
+        raise ValueError("lookup failed for dan.okafor@example.com")
+    except ValueError:
+        log.exception("request failed")
+    text = buf.getvalue()
+    assert "maria.lopez" not in text and "dan.okafor" not in text
+    assert "[email]" in text
+
+
+def test_retention_removes_old_transcripts_and_keeps_the_audit_trail(ctx):
+    ctx.runs.create("old-run-1", "store_order_status_shipped", "rules", "test", None)
+    ctx.runs.finish("old-run-1", "passed", {"passed": True})
+    ctx.audit.record("old-tenant", "test", "run.kept", "old-run-1")
+    import sqlite3
+
+    conn = sqlite3.connect(ctx.db_path)
+    conn.execute("UPDATE runs SET created_at='2020-01-01T00:00:00' WHERE id='old-run-1'")
+    conn.commit()
+    conn.close()
+    preview = ctx.runs.prune_older_than(365, dry_run=True)
+    assert preview["runs"] == 1 and ctx.runs.get("old-run-1") is not None  # dry run removes nothing
+    result = ctx.runs.prune_older_than(365)
+    assert result["runs"] == 1 and ctx.runs.get("old-run-1") is None
+    assert ctx.audit.list("old-tenant")  # the audit trail is kept

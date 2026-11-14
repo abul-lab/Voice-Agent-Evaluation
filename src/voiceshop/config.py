@@ -8,6 +8,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from voiceshop.errors import ConfigError
 
 
 @dataclass(frozen=True)
@@ -23,6 +26,14 @@ class RuntimeSettings:
     max_body_bytes: int
 
 
+def _int(env: dict[str, str], name: str, default: int) -> int:
+    raw = env.get(name, str(default))
+    try:
+        return int(raw)
+    except ValueError:
+        raise ConfigError(f"{name} must be a whole number, got {raw!r}") from None
+
+
 def load_settings(env: dict[str, str] | None = None) -> RuntimeSettings:
     env = dict(os.environ if env is None else env)
     return RuntimeSettings(
@@ -33,6 +44,45 @@ def load_settings(env: dict[str, str] | None = None) -> RuntimeSettings:
         gemini_api_key=env.get("VOICESHOP_GEMINI_API_KEY") or env.get("GEMINI_API_KEY") or None,
         gemini_model=env.get("VOICESHOP_GEMINI_MODEL", "gemini-3.5-flash"),
         local_ui_no_key=env.get("VOICESHOP_LOCAL_UI_NO_KEY", "").lower() in ("1", "true", "yes"),
-        max_concurrent_runs=int(env.get("VOICESHOP_MAX_CONCURRENT_RUNS", "2")),
-        max_body_bytes=int(env.get("VOICESHOP_MAX_BODY_BYTES", "65536")),
+        max_concurrent_runs=_int(env, "VOICESHOP_MAX_CONCURRENT_RUNS", 2),
+        max_body_bytes=_int(env, "VOICESHOP_MAX_BODY_BYTES", 65536),
     )
+
+
+_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+
+
+def problems(settings: RuntimeSettings) -> list[str]:
+    """Everything wrong with the configuration, in plain words. An empty list means it can start."""
+    out: list[str] = []
+    if not 1 <= settings.max_concurrent_runs <= 16:
+        out.append("VOICESHOP_MAX_CONCURRENT_RUNS must be between 1 and 16")
+    if not 1024 <= settings.max_body_bytes <= 10_000_000:
+        out.append("VOICESHOP_MAX_BODY_BYTES must be between 1024 and 10000000")
+    if settings.log_level not in _LEVELS:
+        out.append(f"VOICESHOP_LOG_LEVEL must be one of {', '.join(_LEVELS)}")
+    parent = settings.db_path.parent if str(settings.db_path.parent) else Path(".")
+    if parent.exists() and not parent.is_dir():
+        out.append(f"the database folder {parent} is a file, not a folder")
+    try:
+        from voiceshop.monitor.auth import KeyFileError, KeyRing, load_entries
+
+        KeyRing(load_entries(settings.keys_file))
+    except (KeyFileError, ValueError, OSError) as exc:
+        out.append(f"the API key file {settings.keys_file} cannot be used: {exc}")
+    return out
+
+
+def describe(settings: RuntimeSettings) -> dict[str, Any]:
+    """The effective settings for humans. Secrets are reported as set or not set, never as values."""
+    return {
+        "database": str(settings.db_path),
+        "keys_file": str(settings.keys_file),
+        "shared_admin_key": "set" if settings.api_key else "not set",
+        "gemini_key": "set" if settings.gemini_api_key else "not set",
+        "gemini_model": settings.gemini_model,
+        "local_ui_without_key": settings.local_ui_no_key,
+        "max_concurrent_runs": settings.max_concurrent_runs,
+        "max_body_bytes": settings.max_body_bytes,
+        "log_level": settings.log_level,
+    }

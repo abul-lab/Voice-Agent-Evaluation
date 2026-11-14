@@ -66,6 +66,8 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("--out", type=Path, default=ROOT / "results" / "judge" / "calibration.json")
     c.add_argument("--allow-partial", action="store_true", help="write the result even if some calls failed")
 
+    sub.add_parser("check-config", help="show the effective settings and any problems, without secrets")
+
     pr = sub.add_parser("prune", help="delete run transcripts older than a number of days (the audit trail is kept)")
     pr.add_argument("--older-than-days", type=int, required=True)
     pr.add_argument("--dry-run", action="store_true", help="show what would be removed, remove nothing")
@@ -132,8 +134,20 @@ def _judge_command(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    settings = load_settings()
+    try:
+        settings = load_settings()
+    except VoiceShopError as exc:
+        print(f"configuration problem: {exc}", file=sys.stderr)
+        return 2
     configure_logging(settings.log_level)
+    if args.command == "serve":
+        from voiceshop.config import problems
+
+        issues = problems(settings)
+        if issues:
+            for issue in issues:
+                print(f"configuration problem: {issue}", file=sys.stderr)
+            return 2
     try:
         if args.command == "scenarios":
             for s in load_store_scenarios(SCENARIOS_PATH):
@@ -142,6 +156,17 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command in ("judge", "calibrate"):
             return _judge_command(args)
+
+        if args.command == "check-config":
+            from voiceshop.config import describe, problems
+
+            for key, value in describe(settings).items():
+                print(f"{key:<22} {value}")
+            issues = problems(settings)
+            for issue in issues:
+                print(f"PROBLEM: {issue}")
+            print("configuration OK" if not issues else f"{len(issues)} problem(s) to fix before starting")
+            return 0 if not issues else 2
 
         if args.command == "prune":
             result = ctx_for_prune(settings, args.db).runs.prune_older_than(args.older_than_days, dry_run=args.dry_run)

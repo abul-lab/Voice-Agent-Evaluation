@@ -306,3 +306,25 @@ def test_retention_removes_old_transcripts_and_keeps_the_audit_trail(ctx):
     result = ctx.runs.prune_older_than(365)
     assert result["runs"] == 1 and ctx.runs.get("old-run-1") is None
     assert ctx.audit.list("old-tenant")  # the audit trail is kept
+
+
+def test_bad_settings_are_reported_in_plain_words_before_start(tmp_path):
+    from voiceshop.config import ConfigError, load_settings, problems
+
+    with pytest.raises(ConfigError, match="whole number"):
+        load_settings(env={"VOICESHOP_MAX_CONCURRENT_RUNS": "many"})
+    settings = load_settings(env={"VOICESHOP_MAX_CONCURRENT_RUNS": "99", "VOICESHOP_LOG_LEVEL": "LOUD",
+                                  "VOICESHOP_KEYS_FILE": str(tmp_path / "missing.json")})
+    found = problems(settings)
+    assert any("MAX_CONCURRENT_RUNS" in p for p in found)
+    assert any("LOG_LEVEL" in p for p in found)
+    assert problems(load_settings(env={"VOICESHOP_KEYS_FILE": str(tmp_path / "none.json")})) == []
+
+
+def test_the_configuration_report_never_shows_secret_values():
+    from voiceshop.config import describe, load_settings
+
+    shown = describe(load_settings(env={"VOICESHOP_API_KEY": "super-secret-admin", "GEMINI_API_KEY": "g-secret-1"}))
+    text = json.dumps(shown)
+    assert "super-secret-admin" not in text and "g-secret-1" not in text
+    assert shown["shared_admin_key"] == "set" and shown["gemini_key"] == "set"

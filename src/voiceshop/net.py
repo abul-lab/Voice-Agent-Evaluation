@@ -8,12 +8,14 @@ so API keys cannot leak into logs or reports.
 from __future__ import annotations
 
 import json
+import logging
 import time
 import urllib.error
 import urllib.request
 from typing import Any
 
 RETRY_STATUSES = frozenset({429, 500, 503})
+log = logging.getLogger("voiceshop.net")
 
 
 class ServiceError(RuntimeError):
@@ -42,8 +44,12 @@ def post_json(url: str, body: dict[str, Any], headers: dict[str, str], *, timeou
             if exc.code not in RETRY_STATUSES:
                 raise ServiceError(f"service returned HTTP {exc.code}", status=exc.code) from None
             last_status, last_error = exc.code, f"HTTP {exc.code}"
+            log.warning("service busy, retrying", extra={"status": exc.code, "attempt": attempt + 1,
+                                                        "attempts": attempts})
         except (urllib.error.URLError, TimeoutError) as exc:
             last_status, last_error = None, type(exc).__name__
+            log.warning("service did not answer, retrying", extra={"error": type(exc).__name__,
+                                                                  "attempt": attempt + 1, "attempts": attempts})
         if attempt < attempts - 1:
             time.sleep(base_delay_s * (2 ** attempt))
     raise ServiceError(f"service unavailable after {attempts} attempts ({last_error})", status=last_status)

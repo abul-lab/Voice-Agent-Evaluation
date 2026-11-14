@@ -29,10 +29,12 @@ Answer only with JSON in this form: {{"team": "shopping" | "order" | "refund" | 
 
 
 class GeminiRouteClassifier:
-    def __init__(self, api_key: str, model: str = "gemini-3.5-flash", timeout_s: float = 60.0) -> None:
+    # Routing is on the live path of a shopper's reply: a slow model must fail the case quickly, not hold the run.
+    def __init__(self, api_key: str, model: str = "gemini-3.5-flash", timeout_s: float = 15.0, attempts: int = 2) -> None:
         self.api_key = api_key
         self.model = model
         self.timeout_s = timeout_s
+        self.attempts = attempts
         self.calls = 0
 
     def classify(self, utterance: str) -> str | None:
@@ -43,7 +45,7 @@ class GeminiRouteClassifier:
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
         data = post_json(ENDPOINT.format(model=self.model), body, {"x-goog-api-key": self.api_key},
-                         timeout_s=self.timeout_s, attempts=3)
+                         timeout_s=self.timeout_s, attempts=self.attempts)
         try:
             text = data["candidates"][0]["content"]["parts"][0]["text"]
             team = json.loads(text).get("team")

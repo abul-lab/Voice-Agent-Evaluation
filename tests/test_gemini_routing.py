@@ -122,3 +122,15 @@ def test_the_server_refuses_gemini_runs_without_a_key_and_reports_it(ctx, tmp_pa
         server.shutdown()
         server.server_close()
         app.close()
+
+
+def test_routing_waits_are_short_and_bounded(monkeypatch):
+    seen = {}
+
+    def fake_post(url, body, headers, **kwargs):
+        seen.update(kwargs)
+        return _answer('{"team": "care"}')
+
+    monkeypatch.setattr(route_gemini, "post_json", fake_post)
+    assert GeminiRouteClassifier("fake-key").classify("I want to complain") == "care"
+    assert seen["timeout_s"] <= 15 and seen["attempts"] <= 2  # a slow model cannot hold a run for minutes

@@ -110,9 +110,11 @@ class MonitorApp:
         store_bundle: dict[str, Any] | None = None,
         settings_path: Path | None = None,
         changes_per_minute: int = 30,
+        trust_proxy: bool = False,
         attempts_per_minute: int = 60,
     ) -> None:
         self.ctx = ctx
+        self.trust_proxy = trust_proxy
         self.limit_changes = TokenBucket(changes_per_minute)  # per person, for changes
         self.limit_attempts = TokenBucket(attempts_per_minute)  # per client address, for every mutating try
         # Monitor settings (the storefront URL). None means "this monitor's own /shop page".
@@ -372,7 +374,7 @@ class _Handler(ShopRoutes, BaseHTTPRequestHandler):
     # --------------------------------------------------------------- helpers
     def _authorise(self, role: str, route: str) -> Principal | None:
         """Who is calling, and whether their role allows this route. Sends the error itself and returns None."""
-        if not self.app.limit_attempts.allow(self.client_address[0]):
+        if not self.app.limit_attempts.allow(self._client_address()):
             self._error(429, "rate_limited", "too many requests from this address; slow down", route)
             return None
         if self._local_ui_allowed():
@@ -391,6 +393,14 @@ class _Handler(ShopRoutes, BaseHTTPRequestHandler):
             self._error(429, "rate_limited", f"too many changes by {principal.name}; slow down", route)
             return None
         return principal
+
+    def _client_address(self) -> str:
+        """The address a request came from. Behind a proxy (only when trusted) it is the forwarded client."""
+        if self.app.trust_proxy:
+            forwarded = self.headers.get("X-Forwarded-For", "")
+            if forwarded:
+                return forwarded.split(",")[-1].strip()[:64]  # the address the trusted proxy added
+        return self.client_address[0]
 
     def _local_ui_allowed(self) -> bool:
         """Opt-in, loopback-only bypass for the dashboard on this machine.

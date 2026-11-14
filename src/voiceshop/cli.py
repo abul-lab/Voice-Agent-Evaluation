@@ -250,6 +250,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_concurrent_runs=settings.max_concurrent_runs,
                 max_body_bytes=settings.max_body_bytes,
                 local_ui_no_key=settings.local_ui_no_key,
+                trust_proxy=settings.trust_proxy,
                 store_bundle=store_bundle,
                 settings_path=settings.db_path.parent / "monitor_settings.json",
             )

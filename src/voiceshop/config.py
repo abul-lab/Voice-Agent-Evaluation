@@ -24,6 +24,7 @@ class RuntimeSettings:
     local_ui_no_key: bool  # explicit opt-in: loopback UI may change things without the API key
     max_concurrent_runs: int
     max_body_bytes: int
+    trust_proxy: bool  # behind a reverse proxy: use X-Forwarded-For for per-client limits
 
 
 def _int(env: dict[str, str], name: str, default: int) -> int:
@@ -46,6 +47,7 @@ def load_settings(env: dict[str, str] | None = None) -> RuntimeSettings:
         local_ui_no_key=env.get("VOICESHOP_LOCAL_UI_NO_KEY", "").lower() in ("1", "true", "yes"),
         max_concurrent_runs=_int(env, "VOICESHOP_MAX_CONCURRENT_RUNS", 2),
         max_body_bytes=_int(env, "VOICESHOP_MAX_BODY_BYTES", 65536),
+        trust_proxy=env.get("VOICESHOP_TRUST_PROXY", "").lower() in ("1", "true", "yes"),
     )
 
 

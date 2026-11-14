@@ -1,0 +1,16 @@
+# Local or single-host deployment. The monitor is published on the loopback address only;
+# the TLS proxy (deploy/Caddyfile) is the public entry point.
+services:
+  voiceshop:
+    build: .
+    env_file: .env
+    environment:
+      VOICESHOP_TRUST_PROXY: "1"   # the proxy adds X-Forwarded-For; per-client limits use it
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - voiceshop-data:/data
+    restart: unless-stopped
+
+volumes:
+  voiceshop-data:

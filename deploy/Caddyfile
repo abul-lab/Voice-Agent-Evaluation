@@ -1,0 +1,13 @@
+# Example TLS reverse proxy (Caddy obtains and renews certificates automatically).
+# Replace the host name with your own. The monitor itself listens on loopback only.
+voiceshop.example.com {
+    encode gzip
+    reverse_proxy 127.0.0.1:8765 {
+        header_up X-Forwarded-Proto {scheme}
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+}

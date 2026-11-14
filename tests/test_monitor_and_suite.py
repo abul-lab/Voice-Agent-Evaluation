@@ -333,3 +333,26 @@ def test_changes_are_rate_limited_per_person(ctx, tmp_path):
         server.shutdown()
         server.server_close()
         app.close()
+
+
+def test_behind_a_trusted_proxy_each_client_is_limited_separately(ctx, tmp_path):
+    ring, keys = _ring(tmp_path)
+    app = MonitorApp(ctx, keys=ring, max_concurrent_runs=1, max_body_bytes=4096, store_bundle=_bundle(),
+                     settings_path=tmp_path / "monitor_settings.json", attempts_per_minute=2, trust_proxy=True)
+    base, server = _serve(app)
+    try:
+        def attempt(client):
+            req = urllib.request.Request(base + "/api/evals", data=b"{}", method="POST",
+                                         headers={"Content-Type": "application/json", "X-Forwarded-For": client})
+            try:
+                with urllib.request.urlopen(req, timeout=5):  # noqa: S310
+                    return 200
+            except urllib.error.HTTPError as err:
+                return err.code
+
+        assert [attempt("10.0.0.1") for _ in range(3)][-1] == 429  # one client used up its attempts
+        assert attempt("10.0.0.2") == 401  # a different client is not affected
+    finally:
+        server.shutdown()
+        server.server_close()
+        app.close()

@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _MIGRATIONS: dict[int, list[str]] = {
     1: [
@@ -58,6 +58,10 @@ _MIGRATIONS: dict[int, list[str]] = {
         )
         """,
         "CREATE INDEX IF NOT EXISTS ix_runs_created ON runs (created_at)",
+    ],
+    2: [
+        # Per-step timing of each agent reply (understand, route, dispatch), as JSON.
+        "ALTER TABLE turns ADD COLUMN stages TEXT",
     ],
 }
 

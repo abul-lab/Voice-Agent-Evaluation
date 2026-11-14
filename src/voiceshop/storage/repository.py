@@ -62,7 +62,7 @@ class RunRepository:
         with session(self._db) as conn:
             conn.execute(
                 """INSERT INTO turns (run_id, seq, speaker, language, text_spoken, text_heard, act, intent,
-                   latency_ms, created_at, agent, shop_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   latency_ms, created_at, agent, shop_version, stages) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     run_id,
                     data["seq"],
@@ -76,6 +76,7 @@ class RunRepository:
                     data["created_at"],
                     data.get("agent"),
                     data.get("shop_version"),
+                    json.dumps(data.get("stages")) if data.get("stages") else None,
                 ),
             )
 

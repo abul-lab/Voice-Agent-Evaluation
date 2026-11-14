@@ -7,7 +7,7 @@ Release gates for a multi-agent voice shopping assistant. The shop is fictional 
 - **A four-agent store.** A Front Desk Specialist routes each caller to one of four specialists: Shopping, Order Tracking, Refunds and Customer Care. Specialists act only through a tool gateway that enforces per-agent scopes and writes an audit trail.
 - **A storefront** at `/shop`, which the voice agents shop through. Voice and clicks share one cart.
 - **A live monitor** at `/`: the storefront inside a device, the conversation, the agent network, test runs and results.
-- **A test suite** of 40 scripted callers in three tiers (below), with 20 named checks.
+- **A test suite** of 71 scripted callers in three tiers (below), with 20 named checks. 31 of the cases are red-team attacks.
 - **Speech checks** (optional): caller audio is generated, transcribed with Gemini, and the transcript is routed by the front desk.
 - **A configuration page** at `/config` for the storefront address and each agent's tool permissions.
 
@@ -26,7 +26,8 @@ Run the test tiers from the command line:
 ```bash
 voiceshop eval --tags smoke        # 1 case
 voiceshop eval --tags targeted     # 3 cases
-voiceshop eval                     # full regression, 40 cases
+voiceshop eval                     # full regression, 71 cases
+voiceshop regress                  # compare the last full run with the saved baseline
 voiceshop scenarios                # list the cases
 ```
 
@@ -51,11 +52,20 @@ ruff check src tests
 |---|---|---|
 | Smoke | 1 | The Front Desk Specialist hands a shopper to the Shopping Agent, who recommends a tent. Run on every change. |
 | Targeted regression | 3 | The Front Desk Specialist with each other agent: Shopping (winter bag, then price), Order Tracking (status after verification), Refunds (refund within the window). |
-| Full regression | 40 | Everything above, plus customer care and handoffs, storefront flows, guardrails (prompt injection, data leakage, wrong identity, card details, off-topic requests, abuse), driving safety holds, and background noise (a passing car, rain). Run before a release. |
+| Full regression | 71 | Everything above, plus customer care and handoffs, storefront flows, guardrails, 31 red-team attacks (prompt injection, data extraction, impersonation, social engineering, policy bypass, abuse, off-topic), driving safety holds, and background noise (a passing car, rain). Run before a release. |
 
 Each case is a caller with a fixed goal and a fixed seed, so the same case gives the same conversation.
 
-The gate passes when at least 90% of the cases pass fully and none error. The 90% figure is a starting point; the release bar should be set with the quality owner.
+The release gate passes only when all four hold:
+
+| Gate | Rule |
+|---|---|
+| Pass rate | at least 90% of cases pass fully (a starting point; the quality owner sets the real bar) |
+| No errors | no case ends in an error |
+| Red team | no attack succeeds (limit 0%) |
+| Latency | the 95th percentile of agent reply time is within the budget (250 ms) |
+
+The regression gate (`voiceshop regress`) is separate: every case that passed in the saved baseline must still pass.
 
 ### Checks
 
@@ -71,6 +81,22 @@ The gate passes when at least 90% of the cases pass fully and none error. The 90
 | Conduct | `turn_budget`, `conversation_completed`, `escalation_code` |
 
 Checks read the transcript, the audit log and the store data. An agent's own statement that it did something is not accepted as evidence.
+
+## Quality measures
+
+| Measure | Where it comes from | Command |
+|---|---|---|
+| Failure categories | every failed check belongs to one category (routing, policy, verification, guardrail, task, grounding, resilience, conduct) | `voiceshop eval` (report: *Failure categories*) |
+| Task completion | completion rate, handoff success and mean turns, per goal (shopping, refund, order, care, safety, noise, red team and others) | `voiceshop eval` (report: *Completion by goal*) |
+| Red team | attacks that succeed, out of all attacks | `voiceshop eval --tags redteam` |
+| Latency by step | time spent understanding, routing and dispatching each reply, stored with each turn | `voiceshop eval` (report: *Latency by step*) |
+| Regression | a saved baseline of every case's result | `voiceshop baseline` (write, review in the change) and `voiceshop regress` (compare) |
+| LLM judge | rubric scores for accuracy, helpfulness and tone, and whether a reply invents facts | `voiceshop judge` |
+| Judge calibration | how often the judge agrees with human labels | `voiceshop calibrate` |
+
+**The judge is not yet trusted.** Its calibration labels in `tests/judge/calibration.json` were written by the repository author and must be replaced by the QE team's labels. Until a calibration agreement has been accepted, judge scores are information, not a gate.
+
+The judge runs on a local model (Ollama) for plumbing and integration checks. The Gemini backend exists, but it is not part of any run until the team approves a judged run, because each call has a cost.
 
 ## Architecture
 
@@ -106,7 +132,7 @@ Source layout:
 | `src/voiceshop/monitor/` | HTTP server (standard library), server-sent events, static monitor, storefront and configuration pages |
 | `src/voiceshop/speech/` | Gemini speech adapter and the front desk speech case |
 | `src/voiceshop/simulation/` | Conversation loop and the speech-recognition error model |
-| `src/voiceshop/evaluation/` | Check records, report writing, conduct invariants |
+| `src/voiceshop/evaluation/` | Check records, report writing, conduct invariants, quality analysis, regression gate, LLM judge |
 | `src/voiceshop/storage/` | SQLite storage (WAL mode, schema) |
 | `data/catalog/` | Fictional catalogue, orders and refund policy |
 | `scenarios/` | The store test cases (`store_scenarios.json`) |
@@ -168,6 +194,7 @@ The storefront address is set on the Configuration page and saved to `monitor_se
 1. lint (`ruff check src tests`)
 2. unit, integration and security tests (`pytest`)
 3. the smoke, targeted and full regression tiers (`voiceshop eval`)
+4. the regression gate against the saved baseline (`voiceshop regress`)
 
 Reports are uploaded as build artifacts.
 

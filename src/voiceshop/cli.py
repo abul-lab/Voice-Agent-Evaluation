@@ -41,10 +41,58 @@ def _parser() -> argparse.ArgumentParser:
     e.add_argument("--tags", default="", help="comma-separated tags, e.g. smoke or targeted; empty runs all")
     e.add_argument("--out", type=Path, default=ROOT / "results" / "latest")
 
+    g = sub.add_parser("regress", help="compare a report with the saved baseline (release gate)")
+    g.add_argument("--baseline", type=Path, default=ROOT / "tests" / "baseline" / "store.json")
+    g.add_argument("--report", type=Path, default=ROOT / "results" / "latest" / "report.json")
+
+    b = sub.add_parser("baseline", help="write the baseline from a clean report (review the diff in PRs)")
+    b.add_argument("--report", type=Path, default=ROOT / "results" / "latest" / "report.json")
+    b.add_argument("--out", type=Path, default=ROOT / "tests" / "baseline" / "store.json")
+
+    j = sub.add_parser("judge", help="score the agent's replies in a report with an LLM judge")
+    j.add_argument("--backend", choices=("ollama", "gemini"), default="ollama")
+    j.add_argument("--model", default=None)
+    j.add_argument("--report", type=Path, default=ROOT / "results" / "latest" / "report.json")
+    j.add_argument("--out", type=Path, default=ROOT / "results" / "latest" / "judged.json")
+
+    c = sub.add_parser("calibrate", help="measure how often the judge agrees with the human labels")
+    c.add_argument("--backend", choices=("ollama", "gemini"), default="ollama")
+    c.add_argument("--model", default=None)
+    c.add_argument("--items", type=Path, default=ROOT / "tests" / "judge" / "calibration.json")
+    c.add_argument("--out", type=Path, default=ROOT / "results" / "judge" / "calibration.json")
+
     v = sub.add_parser("serve", help="start the live monitor and storefront")
     v.add_argument("--host", default="127.0.0.1")
     v.add_argument("--port", type=int, default=8765)
     return p
+
+
+def _judge_command(args) -> int:
+    from voiceshop.evaluation.judge import JudgeError, build_facts, calibrate, judge_report, make_backend
+    from voiceshop.evaluation.regression import load_json, write_json
+
+    backend = make_backend(args.backend, args.model)
+    facts = build_facts(Catalog.load(DATA_PATH), StoreData(DATA_PATH))
+    try:
+        if args.command == "judge":
+            result = judge_report(load_json(args.report), backend, facts)
+            write_json(args.out, result)
+            s = result["summary"]
+            print(f"judged {s['turns_judged']} agent replies with {backend.name}:{backend.model} "
+                  f"(parse failures {s['parse_failures']})")
+            print(f"accuracy {s['accuracy']}  helpfulness {s['helpfulness']}  tone {s['tone']}  "
+                  f"invented facts {s['invented_facts']}")
+            print(f"written to {args.out}")
+            return 0
+        result = calibrate(backend, load_json(args.items)["items"], facts)
+        write_json(args.out, result)
+        print(f"calibration with {backend.name}:{backend.model}: agreement {result['agreement']} "
+              f"over {result['items']} items (parse failures {result['parse_failures']})")
+        print(f"written to {args.out}")
+        return 0
+    except JudgeError as exc:
+        print(f"judge error: {exc}", file=sys.stderr)
+        return 3
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,6 +103,28 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "scenarios":
             for s in load_store_scenarios(SCENARIOS_PATH):
                 print(f"{s.id:<44} {','.join(s.tags)}")
+            return 0
+
+        if args.command in ("judge", "calibrate"):
+            return _judge_command(args)
+
+        if args.command == "regress":
+            from voiceshop.evaluation.regression import compare, load_json
+
+            findings = compare(load_json(args.baseline), load_json(args.report))
+            if not findings:
+                print("regression gate: PASS (no case regressed against the baseline)")
+                return 0
+            print(f"regression gate: FAIL ({len(findings)} finding(s))")
+            for f in findings:
+                print(f"  [{f.rule}] {f.scenario_id or ''} {f.detail}".rstrip())
+            return 1
+
+        if args.command == "baseline":
+            from voiceshop.evaluation.regression import load_json, make_baseline, write_json
+
+            write_json(args.out, make_baseline(load_json(args.report)))
+            print(f"baseline written to {args.out}")
             return 0
 
         ctx = build_context(settings, args.db)

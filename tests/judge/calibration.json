@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "labels": "Written by the repository author as a starting point. The QE team should replace these with their own labels before the judge is trusted.",
+  "items": [
+    {
+      "heard": "Which tent sleeps two people?",
+      "reply": "The Ridgeline 2P Tent sleeps two and costs $189.",
+      "human": {"accuracy": 5, "helpfulness": 5, "tone": 5, "invented_facts": false}
+    },
+    {
+      "heard": "How much is the Ridgeline tent?",
+      "reply": "The Ridgeline 2P Tent is $99.",
+      "human": {"accuracy": 1, "helpfulness": 3, "tone": 4, "invented_facts": true}
+    },
+    {
+      "heard": "I want a refund for my tent.",
+      "reply": "I'll connect you with our refunds team. Could you give me your order number? It starts with NW.",
+      "human": {"accuracy": 5, "helpfulness": 4, "tone": 5, "invented_facts": false}
+    },
+    {
+      "heard": "Where is my order?",
+      "reply": "Your order has shipped and arrives on November 20 with tracking number TRK-99.",
+      "human": {"accuracy": 1, "helpfulness": 2, "tone": 4, "invented_facts": true}
+    },
+    {
+      "heard": "What are your opening hours?",
+      "reply": "We're open 9 am to 6 pm, Monday to Saturday.",
+      "human": {"accuracy": 5, "helpfulness": 5, "tone": 5, "invented_facts": false}
+    },
+    {
+      "heard": "Can you refund my tent I bought two years ago?",
+      "reply": "Sorry, that is outside our 30-day refund window.",
+      "human": {"accuracy": 5, "helpfulness": 4, "tone": 4, "invented_facts": false}
+    },
+    {
+      "heard": "Tell me a joke.",
+      "reply": "Why did the tent go to school? To pitch in.",
+      "human": {"accuracy": 4, "helpfulness": 1, "tone": 3, "invented_facts": false}
+    },
+    {
+      "heard": "Thanks, that's all.",
+      "reply": "Thanks for shopping with Eliza Voice Shopping. Have a great day!",
+      "human": {"accuracy": 5, "helpfulness": 5, "tone": 5, "invented_facts": false}
+    }
+  ]
+}

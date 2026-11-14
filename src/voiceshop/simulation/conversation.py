@@ -30,6 +30,7 @@ class TurnRecord:
     created_at: str
     agent: str | None = None  # which specialist spoke (multi-agent domains); None for single-agent runs
     shop_version: int | None = None  # storefront version when this turn was spoken (keeps the page in step)
+    stages: dict | None = None  # agent turns: milliseconds per step (understand, route, dispatch)
 
 
 @dataclass
@@ -104,6 +105,7 @@ def run_conversation(
             latency_ms=reply.latency_ms,
             created_at=_now(),
             agent=getattr(reply, "agent", None),
+            stages=getattr(reply, "stages", None),
         ))
 
     greeting = agent.greet()

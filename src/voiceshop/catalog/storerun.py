@@ -22,6 +22,7 @@ from voiceshop.catalog.shop import ShopSessions
 from voiceshop.catalog.shopper import GOALS, Goal, ShopperSimulator
 from voiceshop.catalog.store import StoreData, ToolGateway
 from voiceshop.errors import ScenarioError
+from voiceshop.evaluation.analysis import analyse, category_of
 from voiceshop.evaluation.checks import Check
 from voiceshop.evaluation.harness import aggregate, write_reports
 from voiceshop.evaluation.invariants import dialogue_violations
@@ -406,12 +407,12 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
             "conversation": [
                 {"seq": t.seq, "speaker": t.speaker, "language": t.language, "text_spoken": t.text_spoken,
                  "text_heard": t.text_heard, "act": t.act, "intent": t.intent, "latency_ms": t.latency_ms,
-                 "agent": t.agent}
+                 "agent": t.agent, "stages": t.stages}
                 for t in run.turns
             ],
         })
 
-    summary = aggregate(records, threshold)
+    summary = analyse(records, aggregate(records, threshold))
     # Store runs have their own check names, so report every name that actually occurred.
     names = sorted({c["name"] for r in records for c in r["checks"]})
     summary["check_pass_rates"] = {
@@ -428,7 +429,7 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
         "summary": summary,
         "failures": [
             {"run_id": r["run_id"], "scenario_id": r["scenario_id"],
-             "failed_checks": [c for c in r["checks"] if not c["passed"]]}
+             "failed_checks": [{**c, "category": category_of(c["name"])} for c in r["checks"] if not c["passed"]]}
             for r in records if not r["passed"]
         ],
         "runs": [{k: v for k, v in r.items() if k != "conversation"} for r in records],

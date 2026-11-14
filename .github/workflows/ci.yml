@@ -30,6 +30,8 @@ jobs:
         run: voiceshop --db results/ci.db eval --tags targeted --out results/ci-targeted
       - name: Full regression (all cases)
         run: voiceshop --db results/ci.db eval --out results/ci-full
+      - name: Regression gate against the saved baseline
+        run: voiceshop regress --report results/ci-full/report.json
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4

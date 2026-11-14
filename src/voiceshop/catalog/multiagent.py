@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 import time as _clock
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -95,6 +95,7 @@ class StoreReply:
     terminal: bool
     state: dict[str, Any]
     agent: str
+    stages: dict[str, float] = field(default_factory=dict)  # ms per step of this reply
 
 
 class Conductor:
@@ -113,6 +114,7 @@ class Conductor:
         self.active: str | None = None
         self.path: list[str] = []
         self.ended = False
+        self._stage: dict[str, float] = {}
         self.driving = False  # set by "I'm driving", cleared by "I've parked"
 
     # ------------------------------------------------------------- entry
@@ -124,11 +126,14 @@ class Conductor:
 
     def respond(self, utterance: str) -> StoreReply:
         started = _clock.perf_counter()
+        self._stage = {}
         if self.ended:
             return self._reply("router", "close", {}, f"Thanks for shopping with {BRAND}. Have a great day!",
                                None, started, terminal=True)
         f = fold(utterance)
         u = self.shop.understand(utterance)
+        t_understood = _clock.perf_counter()
+        self._stage["understand_ms"] = round((t_understood - started) * 1000, 3)
         self._capture(utterance)
         if _has(f, DRIVING_CUES):
             self.driving = True
@@ -141,6 +146,8 @@ class Conductor:
                                    u.intent, started, terminal=True)
             return self._reply("router", "safety_hold", {}, SAFETY_TEXT, u.intent, started)
         target = self._route(utterance, f, u)
+        t_routed = _clock.perf_counter()
+        self._stage["route_ms"] = round((t_routed - t_understood) * 1000, 3)
 
         if target == "close":
             self.ended = True
@@ -157,6 +164,7 @@ class Conductor:
         self.active = target
         self.path.append(target)
         act, params, body = self._dispatch(target, utterance, f, u)
+        self._stage["dispatch_ms"] = round((_clock.perf_counter() - t_routed) * 1000, 3)
         text = f"I'll connect you with our {NAMES[target]}. {body}" if switched else body
         return self._reply(target, act, params, text, u.intent, started)
 
@@ -388,7 +396,7 @@ class Conductor:
             text=text, act=act, params=params, language="en", intent=intent,
             latency_ms=round((_clock.perf_counter() - started) * 1000, 3), terminal=terminal,
             state={"active": self.active, "verified": self.session.verified, "failed": self.session.failed},
-            agent=agent,
+            agent=agent, stages=dict(self._stage),
         )
 
 

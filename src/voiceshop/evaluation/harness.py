@@ -109,6 +109,7 @@ def to_markdown(report: dict[str, Any]) -> str:
         "|---|---|",
     ]
     lines += [f"| {name} | {rate:.1%} |" for name, rate in s["check_pass_rates"].items()]
+    lines += _analysis_lines(s)
     lines += ["", "## By language", "", "| Language | Passed / total |", "|---|---|"]
     lines += [f"| {k} | {v['passed']} / {v['total']} |" for k, v in sorted(s["by_language"].items())]
     lines += ["", "## Runs", "", "| Scenario | Result | Turns | WER |", "|---|---|---|---|"]
@@ -124,6 +125,30 @@ def to_markdown(report: dict[str, Any]) -> str:
                 lines.append(f"- **{c['name']}**: {c['detail']}")
             lines.append("")
     return "\n".join(lines) + "\n"
+
+
+def _analysis_lines(s: dict[str, Any]) -> list[str]:
+    """Sections added by the store analysis. Absent for reports that were written without it."""
+    if "gates" not in s:
+        return []
+    lines = ["", "## Release gates", "", "| Gate | Result |", "|---|---|"]
+    lines += [f"| {name} | {'PASS' if ok else 'FAIL'} |" for name, ok in s["gates"].items()]
+    sec, lat = s["security"], s["latency_gate"]
+    lines += ["", f"Red team: {sec['succeeded']} of {sec['attacks']} attacks succeeded "
+              f"(limit {sec['limit']:.0%}). Agent latency p95 {lat['p95_ms']} ms (budget {lat['budget_ms']:.0f} ms).",
+              "", "## Failure categories", ""]
+    cats = s["failure_analysis"]["by_category"]
+    lines += ["| Category | Failed checks |", "|---|---|"] + [f"| {k} | {v} |" for k, v in cats.items()]
+    if not cats:
+        lines.append("| none | 0 |")
+    lines += ["", "## Completion by goal", "", "| Goal | Cases | Completed | Completion | Handoff right | Mean turns |",
+              "|---|---|---|---|---|---|"]
+    for goal, c in s["completion"].items():
+        lines.append(f"| {goal} | {c['cases']} | {c['completed']} | {c['completion_rate']:.0%} | "
+                     f"{_fmt_pct(c['handoff_success_rate'])} | {c['mean_turns']} |")
+    lines += ["", "## Latency by step (ms)", "", "| Step | p50 | p95 | Samples |", "|---|---|---|---|"]
+    lines += [f"| {k} | {v['p50']} | {v['p95']} | {v['n']} |" for k, v in s["stage_latency_ms"].items()]
+    return lines
 
 
 def _fmt_pct(value: float | None) -> str:

@@ -154,7 +154,7 @@ def test_scenarios_are_listed_with_their_test_types(live):
     base, _ = live
     status, raw, _ = _get(base + "/api/scenarios")
     items = json.loads(raw)["items"]
-    assert status == 200 and len(items) == 40
+    assert status == 200 and len(items) == 71
     smoke = [i for i in items if "smoke" in i["test_types"]]
     targeted = [i for i in items if "targeted" in i["test_types"]]
     assert len(smoke) == 1 and len(targeted) == 3

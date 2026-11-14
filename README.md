@@ -225,8 +225,20 @@ voiceshop prune --older-than-days 90
 
 **Containers and TLS.** `Dockerfile`, `docker-compose.yml` and `deploy/Caddyfile` are included. The monitor listens
 on loopback behind a TLS proxy. Set `VOICESHOP_TRUST_PROXY=1` only when the proxy adds `X-Forwarded-For`.
-See `.env.example` for the variables. The container image has not been built in this repository's current
-environment; build it before relying on it.
+See `.env.example` for the variables.
+
+Build and run the image (checked on 2026-11-14 with Docker 29.5, on Windows):
+
+```bash
+docker build -t voiceshop:0.1.0 .
+docker run --rm -v voiceshop-data:/data voiceshop:0.1.0 voiceshop keys create --name ops --role admin   # copy the key
+docker run -d --name voiceshop -p 127.0.0.1:8765:8765 -v voiceshop-data:/data voiceshop:0.1.0
+curl http://127.0.0.1:8765/readyz
+```
+
+Verified: the image builds; it refuses to serve on a public address without a key; it runs as a non-root user;
+the health check reports healthy; an unauthenticated change is refused with 401 and an authenticated one is
+accepted; data is kept in the volume.
 
 **Stopping.** On SIGTERM or Ctrl+C the server stops accepting requests, asks running suites to stop, and waits
 up to 30 seconds. Runs still marked running after a restart are recorded as interrupted.

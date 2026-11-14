@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eliza Voice Shopping</title>
+  <link rel="stylesheet" href="/shop.css">
+  <script src="/shop.js" defer></script>
+</head>
+<body>
+  <header class="evs-header">
+    <div class="evs-header-inner">
+      <a href="#" class="evs-logo" data-page="home" aria-label="Eliza Voice Shopping home">
+        <span class="evs-mark" aria-hidden="true">E</span>
+        <span class="evs-name"><strong>Eliza</strong> Voice Shopping</span>
+      </a>
+      <nav class="evs-nav" aria-label="Categories">
+        <a href="#" data-page="home">Home</a>
+        <a href="#" data-page="category:tent">Tents</a>
+        <a href="#" data-page="category:sleeping_bag">Sleeping bags</a>
+        <a href="#" data-page="category:backpack">Backpacks</a>
+        <a href="#" data-page="category:stove">Stoves</a>
+      </nav>
+      <button type="button" class="evs-cart-btn" data-page="cart" aria-label="View cart">
+        <span>Cart</span>
+        <span id="cart-count" class="evs-cart-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="modebar" class="modebar" role="region" aria-label="Shopping mode">
+    <div class="modebar-inner">
+      <div class="mode-status">
+        <span id="mode-dot" class="mode-dot"></span>
+        <div>
+          <strong id="mode-title">Eliza is listening</strong>
+          <span id="mode-sub" class="mode-sub">Speak to Eliza or keep shopping by clicks. Your cart is shared.</span>
+        </div>
+      </div>
+      <button type="button" id="mode-toggle" class="mode-toggle">Shop by clicks</button>
+    </div>
+  </div>
+
+  <main class="evs-main">
+    <section id="page" class="evs-page" aria-live="polite"></section>
+    <aside class="evs-activity" aria-label="Activity">
+      <h2>Live activity</h2>
+      <p class="evs-muted">Everything Eliza and you do in this session shows up here.</p>
+      <ol id="activity" class="activity-list"></ol>
+    </aside>
+  </main>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <footer class="evs-footer">
+    <span>Eliza Voice Shopping · demonstration store · test payments only</span>
+  </footer>
+</body>
+</html>

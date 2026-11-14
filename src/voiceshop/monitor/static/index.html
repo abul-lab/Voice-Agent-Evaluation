@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eliza Voice Shopping · Monitor</title>
+  <link rel="stylesheet" href="/monitor.css">
+  <script src="/voice.js" defer></script>
+  <script src="/agents.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">E</span>
+        <div>
+          <h1>Eliza Voice Shopping</h1>
+          <p>Experience End-to-End Voice Shopping</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="/" class="active" aria-current="page">Monitor</a>
+        <a href="/tests">Test Cases</a>
+        <a href="/history">Execution history</a>
+        <a href="/config">Configuration</a>
+      </nav>
+      <div class="top-controls">
+        <label class="select">
+          <span>Understanding</span>
+          <select id="mode-select">
+            <option value="rules">Rules</option>
+            
+          </select>
+        </label>
+        <label class="select">
+          <span>Playback</span>
+          <select id="speed-select">
+            <option value="800">Live</option>
+            <option value="1500">Slow</option>
+            <option value="0">Instant</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="card toolbar" aria-label="Test controls">
+      <label class="field key-field hidden" id="key-field">
+        <span>API key</span>
+        <input id="api-key" type="password" autocomplete="off" placeholder="Required on this machine">
+      </label>
+      <div class="actions">
+        <label class="field test-type">
+          <span>Test type</span>
+          <select id="test-type">
+            <option value="smoke">Smoke</option>
+            <option value="targeted">Targeted regression</option>
+            <option value="regression">Full regression</option>
+          </select>
+        </label>
+        <button id="run-btn" type="button" class="btn primary">Run tests</button>
+        <button id="stop-run" type="button" class="btn ghost" disabled>Stop</button>
+        <button id="reset-btn" type="button" class="btn ghost">Reset</button>
+        <button type="button" class="btn ghost" data-speaker-toggle aria-pressed="false">Laptop speaker: Off</button>
+      </div>
+    </section>
+
+    <div class="status-row">
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="suite-bar">
+        <span id="suite-fill"></span>
+      </div>
+      <span id="suite-text">No suite running</span>
+      <span id="control-msg" class="msg" role="status"></span>
+    </div>
+
+    <section class="stage" aria-label="Live session and test sessions">
+      <div class="device-col">
+        <div class="monitor" id="monitor">
+          <div class="monitor-bar">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <code id="sut-address" class="address">Select a session or run tests</code>
+            <span id="cart-chip" class="chip hidden">Cart</span>
+            <span id="mode-pill" class="chip hidden">Voice</span>
+            <span id="sut-state" class="badge">Idle</span>
+            <a id="demo-link" class="btn ghost small hidden" target="_blank" rel="noopener">Open</a>
+          </div>
+          <div class="monitor-screen">
+            <iframe id="sut-frame" title="Eliza Voice Shopping storefront" src="about:blank"></iframe>
+
+            <div class="agent-strip" aria-label="Agents">
+              <div id="roster" class="roster"></div>
+            </div>
+
+            <aside id="voice-overlay" class="voice-overlay" aria-label="Voice conversation">
+              <header class="ov-head">
+                <div class="ov-title">
+                  <span class="ov-dot" aria-hidden="true"></span>
+                  <div>
+                    <strong id="transcript-title">Eliza voice</strong>
+                    <span id="transcript-sub" class="ov-sub">No session selected</span>
+                  </div>
+                </div>
+                <div class="ov-actions">
+                  <span id="live-badge" class="live-badge hidden">Live</span>
+                  <button id="btn-takeover" type="button" class="btn ghost small" disabled>Shop by clicks</button>
+                  <button id="btn-resume" type="button" class="btn ghost small" disabled>Resume voice</button>
+                  <button id="conv-view" type="button" class="btn ghost small">View all</button>
+                  <button id="play-run" type="button" class="btn ghost small" disabled>Play</button>
+                </div>
+              </header>
+              <div id="conversation" class="conversation" aria-live="polite">
+                <p class="empty">The conversation appears here when a test runs.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+        <div class="stand" aria-hidden="true"></div>
+        <div class="base" aria-hidden="true"></div>
+      </div>
+
+      <div class="side-stack">
+        <article class="card">
+          <div class="card-head">
+            <h2>Metric summary</h2>
+            <span id="summary-scope" class="count">recent runs</span>
+          </div>
+          <div id="summary" class="tiles"></div>
+        </article>
+
+        <aside class="card table-card" aria-label="Test sessions">
+          <div class="card-head">
+            <div>
+              <h2>Sessions and tests</h2>
+              <p class="muted small">Select a row to load its storefront and conversation.</p>
+            </div>
+            <span id="runs-count" class="count">0</span>
+          </div>
+          <div class="table-wrap">
+            <table class="sessions-table">
+              <thead>
+                <tr>
+                  <th scope="col">Session</th>
+                  <th scope="col">Test</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Outcome</th>
+                </tr>
+              </thead>
+              <tbody id="runs-body"></tbody>
+            </table>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <article class="card net-card net-hidden" aria-label="Agent network" aria-hidden="true">
+      <div class="net-head">
+        <div>
+          <h2 id="net-title">Agent network</h2>
+          <p class="muted small">Who is speaking, handoffs, identity checks and tool calls, as they happen</p>
+        </div>
+        <div class="net-meta"><span id="net-live" class="live-pill">IDLE</span></div>
+      </div>
+      <div id="net-stats" class="net-stats"></div>
+      <div class="net-stage">
+        <svg id="net-svg" viewBox="0 0 960 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Live agent network"></svg>
+      </div>
+    </article>
+
+    <div class="layout">
+      <section class="center" aria-label="Outcome and timeline">
+        <article class="card">
+          <div class="card-head">
+            <h2>Outcome</h2>
+            <span id="result-badge" class="badge">—</span>
+          </div>
+          <dl id="metrics" class="kv"></dl>
+          <h2 class="small muted">Checks</h2>
+          <ul id="checks" class="checks"><li class="muted">Checks appear when a run finishes.</li></ul>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h2 id="timeline-title">Agent timeline</h2>
+              <p id="exec-line" class="muted small">Waiting for a test.</p>
+            </div>
+            <span id="exec-status" class="badge">Idle</span>
+          </div>
+          <div id="lanes" class="lanes" aria-live="polite"></div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-inner">Eliza Voice Shopping is a demonstration store. Test payments only. Names and phone numbers are never written to logs.</div>
+  </footer>
+</body>
+</html>

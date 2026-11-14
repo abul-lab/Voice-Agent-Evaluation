@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "store": {
+    "id": "eliza_voice_shopping",
+    "name": "Eliza Voice Shopping"
+  },
+  "categories": {
+    "tent": [
+      "tent",
+      "tents",
+      "shelter"
+    ],
+    "sleeping_bag": [
+      "sleeping bag",
+      "sleeping bags",
+      "bag",
+      "bags"
+    ],
+    "backpack": [
+      "backpack",
+      "backpacks",
+      "pack",
+      "packs",
+      "rucksack"
+    ],
+    "stove": [
+      "stove",
+      "stoves",
+      "cooker"
+    ]
+  },
+  "products": [
+    {
+      "id": "tent-01",
+      "name": "Ridgeline 2P Tent",
+      "category": "tent",
+      "price": 189,
+      "weight_kg": 1.9,
+      "capacity": 2,
+      "season": 3,
+      "stock": 6
+    },
+    {
+      "id": "tent-02",
+      "name": "Summit 4P Dome",
+      "category": "tent",
+      "price": 329,
+      "weight_kg": 3.8,
+      "capacity": 4,
+      "season": 4,
+      "stock": 2
+    },
+    {
+      "id": "tent-03",
+      "name": "Trailhead 1P Solo",
+      "category": "tent",
+      "price": 139,
+      "weight_kg": 1.1,
+      "capacity": 1,
+      "season": 3,
+      "stock": 0
+    },
+    {
+      "id": "tent-04",
+      "name": "Basecamp 6P Family",
+      "category": "tent",
+      "price": 459,
+      "weight_kg": 6.2,
+      "capacity": 6,
+      "season": 3,
+      "stock": 4
+    },
+    {
+      "id": "bag-01",
+      "name": "Ember 0C Bag",
+      "category": "sleeping_bag",
+      "price": 149,
+      "weight_kg": 1.2,
+      "capacity": 1,
+      "season": 3,
+      "stock": 9
+    },
+    {
+      "id": "bag-02",
+      "name": "Arctic -18C Bag",
+      "category": "sleeping_bag",
+      "price": 289,
+      "weight_kg": 2.1,
+      "capacity": 1,
+      "season": 4,
+      "stock": 3
+    },
+    {
+      "id": "bag-03",
+      "name": "Breeze 10C Bag",
+      "category": "sleeping_bag",
+      "price": 99,
+      "weight_kg": 0.9,
+      "capacity": 1,
+      "season": 2,
+      "stock": 12
+    },
+    {
+      "id": "pack-01",
+      "name": "Trail 40L Pack",
+      "category": "backpack",
+      "price": 129,
+      "weight_kg": 1.4,
+      "capacity": 1,
+      "season": 3,
+      "stock": 7
+    },
+    {
+      "id": "pack-02",
+      "name": "Expedition 75L Pack",
+      "category": "backpack",
+      "price": 249,
+      "weight_kg": 2.6,
+      "capacity": 1,
+      "season": 4,
+      "stock": 0
+    },
+    {
+      "id": "stove-01",
+      "name": "Pocket Stove",
+      "category": "stove",
+      "price": 59,
+      "weight_kg": 0.2,
+      "capacity": 1,
+      "season": 3,
+      "stock": 15
+    },
+    {
+      "id": "stove-02",
+      "name": "Canister Stove Pro",
+      "category": "stove",
+      "price": 109,
+      "weight_kg": 0.5,
+      "capacity": 1,
+      "season": 3,
+      "stock": 5
+    }
+  ],
+  "rules": {
+    "lightweight_max_kg": 1.5,
+    "recommend_max": 2
+  },
+  "orders": [
+    {
+      "id": "NW-1001",
+      "email": "maria.lopez@example.com",
+      "status": "delivered",
+      "delivered_on": "2026-11-05",
+      "tracking": "1Z-NW-100122",
+      "items": [
+        "tent-01"
+      ],
+      "total": 189,
+      "final_sale": false
+    },
+    {
+      "id": "NW-1002",
+      "email": "dan.okafor@example.com",
+      "status": "shipped",
+      "eta": "2026-11-19",
+      "tracking": "1Z-NW-884213",
+      "items": [
+        "bag-02"
+      ],
+      "total": 289,
+      "final_sale": false
+    },
+    {
+      "id": "NW-1003",
+      "email": "lee.park@example.com",
+      "status": "delivered",
+      "delivered_on": "2026-09-30",
+      "tracking": "1Z-NW-553901",
+      "items": [
+        "pack-01"
+      ],
+      "total": 129,
+      "final_sale": false
+    },
+    {
+      "id": "NW-1004",
+      "email": "sam.ortiz@example.com",
+      "status": "delivered",
+      "delivered_on": "2026-11-10",
+      "tracking": "1Z-NW-771045",
+      "items": [
+        "stove-01"
+      ],
+      "total": 59,
+      "final_sale": true
+    },
+    {
+      "id": "NW-1005",
+      "email": "ana.torres@example.com",
+      "status": "processing",
+      "eta": "2026-11-21",
+      "tracking": null,
+      "items": [
+        "tent-02"
+      ],
+      "total": 329,
+      "final_sale": false
+    }
+  ],
+  "policy": {
+    "version": "2026.11",
+    "refund_window_days": 30,
+    "refund_timeline": "5 to 7 business days",
+    "rules": [
+      {
+        "id": "REFUND-DELIVERED",
+        "text": "Only delivered orders can be refunded."
+      },
+      {
+        "id": "REFUND-FINAL-SALE",
+        "text": "Final-sale items cannot be refunded."
+      },
+      {
+        "id": "REFUND-WINDOW-30",
+        "text": "Refunds must be requested within 30 days of delivery."
+      }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src tests
+      - name: Unit, integration and security tests
+        run: pytest -q
+      - name: Smoke test cases (one case)
+        run: voiceshop --db results/ci.db eval --tags smoke --out results/ci-smoke
+      - name: Targeted regression (three cases)
+        run: voiceshop --db results/ci.db eval --tags targeted --out results/ci-targeted
+      - name: Full regression (all cases)
+        run: voiceshop --db results/ci.db eval --out results/ci-full
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-reports
+          path: results/ci-*/

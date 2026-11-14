@@ -1,0 +1,144 @@
+"""Repositories for the audit trail, runs and conversation turns."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from voiceshop.storage.db import session
+
+
+def _now() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+class AuditLog:
+    """Append-only audit trail of every state change. Never updated or deleted by the app."""
+
+    def __init__(self, db_path: Path) -> None:
+        self._db = db_path
+
+    def record(self, tenant_id: str, actor: str, action: str, entity_id: str | None, **detail: Any) -> None:
+        with session(self._db) as conn:
+            conn.execute(
+                "INSERT INTO audit_events (ts, tenant_id, actor, action, entity_id, detail) VALUES (?,?,?,?,?,?)",
+                (_now(), tenant_id, actor, action, entity_id, json.dumps(detail, default=str)),
+            )
+
+    def list(self, tenant_id: str, after_id: int = 0) -> list[dict[str, Any]]:
+        return self.since(tenant_id, after_id)
+
+    def since(self, tenant_id: str, after_id: int = 0) -> list[dict[str, Any]]:
+        """Audit entries for one tenant with id greater than after_id, in order. Used for live streaming."""
+        with session(self._db) as conn:
+            rows = conn.execute(
+                "SELECT id, ts, actor, action, entity_id, detail FROM audit_events "
+                "WHERE tenant_id=? AND id>? ORDER BY id",
+                (tenant_id, after_id),
+            ).fetchall()
+        return [{**dict(r), "detail": json.loads(r["detail"])} for r in rows]
+
+
+class RunRepository:
+    """Persistence for simulation runs and their turn-by-turn transcripts (read by the monitor)."""
+
+    def __init__(self, db_path: Path) -> None:
+        self._db = db_path
+
+    def create(self, run_id: str, scenario_id: str, mode: str, source: str, batch_id: str | None) -> None:
+        with session(self._db) as conn:
+            conn.execute(
+                """INSERT INTO runs (id, batch_id, scenario_id, mode, source, status, created_at)
+                   VALUES (?,?,?,?,?,'running',?)""",
+                (run_id, batch_id, scenario_id, mode, source, _now()),
+            )
+
+    def append_turn(self, run_id: str, turn: Any) -> None:
+        data = asdict(turn)
+        with session(self._db) as conn:
+            conn.execute(
+                """INSERT INTO turns (run_id, seq, speaker, language, text_spoken, text_heard, act, intent,
+                   latency_ms, created_at, agent, shop_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    run_id,
+                    data["seq"],
+                    data["speaker"],
+                    data["language"],
+                    data["text_spoken"],
+                    data["text_heard"],
+                    data["act"],
+                    data["intent"],
+                    data["latency_ms"],
+                    data["created_at"],
+                    data.get("agent"),
+                    data.get("shop_version"),
+                ),
+            )
+
+    def finish(self, run_id: str, status: str, summary: dict[str, Any]) -> None:
+        with session(self._db) as conn:
+            conn.execute(
+                "UPDATE runs SET status=?, finished_at=?, summary=? WHERE id=?",
+                (status, _now(), json.dumps(summary, default=str), run_id),
+            )
+
+    def list(self, limit: int = 50, batch_id: str | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM runs"
+        params: list[Any] = []
+        if batch_id:
+            sql += " WHERE batch_id=?"
+            params.append(batch_id)
+        sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
+        params.append(max(1, min(limit, 200)))
+        with session(self._db) as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [self._run_dict(r) for r in rows]
+
+    def get(self, run_id: str) -> dict[str, Any] | None:
+        with session(self._db) as conn:
+            row = conn.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+        return self._run_dict(row) if row else None
+
+    def turns(self, run_id: str, after_seq: int = 0) -> list[dict[str, Any]]:
+        with session(self._db) as conn:
+            rows = conn.execute(
+                "SELECT * FROM turns WHERE run_id=? AND seq>? ORDER BY seq", (run_id, after_seq)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def clear(self) -> int:
+        """Delete all run records and their turns. Returns the number of runs removed.
+        The audit trail is not touched: it is a compliance record, not a view of history."""
+        with session(self._db) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                n = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+                conn.execute("DELETE FROM turns")
+                conn.execute("DELETE FROM runs")
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        return n
+
+    def running_count(self) -> int:
+        with session(self._db) as conn:
+            return conn.execute("SELECT COUNT(*) FROM runs WHERE status='running'").fetchone()[0]
+
+    def counts(self) -> dict[str, int]:
+        with session(self._db) as conn:
+            rows = conn.execute("SELECT status, COUNT(*) AS n FROM runs GROUP BY status").fetchall()
+            turns = conn.execute("SELECT COUNT(*) FROM turns").fetchone()[0]
+        out = {r["status"]: r["n"] for r in rows}
+        out["turns"] = turns
+        return out
+
+    @staticmethod
+    def _run_dict(row: sqlite3.Row) -> dict[str, Any]:
+        d = dict(row)
+        d["summary"] = json.loads(d["summary"] or "{}")
+        return d

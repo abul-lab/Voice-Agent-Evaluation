@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configuration · Eliza Voice Shopping</title>
+  <link rel="stylesheet" href="/monitor.css">
+  <script src="/config.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">E</span>
+        <div>
+          <h1>Eliza Voice Shopping</h1>
+          <p>Experience End-to-End Voice Shopping</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="/">Monitor</a>
+        <a href="/tests">Test Cases</a>
+        <a href="/history">Execution history</a>
+        <a href="/config" class="active" aria-current="page">Configuration</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Storefront</h2>
+          <p class="muted small">The storefront page that the voice agents shop through. The monitor shows it in the device, and every test session runs there.</p>
+        </div>
+      </div>
+      <form id="storefront-form" class="config-form" novalidate>
+        <label class="field">
+          <span>Storefront address</span>
+          <input id="storefront-url" type="url" spellcheck="false" autocomplete="off"
+                 placeholder="http://localhost:8765/shop">
+        </label>
+        <p id="storefront-default" class="muted small"></p>
+        <div class="actions">
+          <button id="storefront-save" type="submit" class="btn primary">Save</button>
+          <button id="storefront-default-btn" type="button" class="btn ghost">Use the default</button>
+        </div>
+        <p id="config-msg" class="muted small" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Voice agents</h2>
+          <p class="muted small">The front desk routes each caller to one of these agents. Each agent may use only the tools listed for it.</p>
+        </div>
+      </div>
+      <table class="agents-table">
+        <thead>
+          <tr><th scope="col">Agent</th><th scope="col">Tools it may use</th></tr>
+        </thead>
+        <tbody id="agent-rows"></tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

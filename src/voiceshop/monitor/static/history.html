@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Execution history · Eliza Voice Shopping</title>
+  <link rel="stylesheet" href="/monitor.css">
+  <script src="/history.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">E</span>
+        <div>
+          <h1>Eliza Voice Shopping</h1>
+          <p>Experience End-to-End Voice Shopping</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="/">Monitor</a>
+        <a href="/tests">Test Cases</a>
+        <a href="/history" class="active" aria-current="page">Execution history</a>
+        <a href="/config">Configuration</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section id="list-view">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Execution history</h2>
+            <p class="muted small">Every test run is recorded with a unique execution ID. Clearing history removes these records; the audit trail is kept.</p>
+          </div>
+          <div class="head-actions">
+            <span id="hist-count" class="count">0 executions</span>
+            <button id="hist-refresh" type="button" class="btn ghost small">Refresh</button>
+            <button id="hist-clear" type="button" class="btn danger small">Clear history</button>
+          </div>
+        </div>
+        <p id="hist-msg" class="msg" role="status"></p>
+        <div class="table-wrap">
+          <table class="sessions-table history-table">
+            <thead>
+              <tr>
+                <th scope="col">Execution ID</th>
+                <th scope="col">Test</th>
+                <th scope="col">Source</th>
+                <th scope="col">Started</th>
+                <th scope="col">Status</th>
+                <th scope="col">Outcome</th>
+                <th scope="col">Checks</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="hist-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="detail-view" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <a href="/history" class="btn ghost small">← All executions</a>
+            <h2 id="det-title" class="det-title">Execution</h2>
+            <code id="det-id" class="mono muted small"></code>
+          </div>
+          <span id="det-status" class="badge">—</span>
+        </div>
+        <dl id="det-meta" class="kv det-meta"></dl>
+      </div>
+
+      <div class="det-grid">
+        <div class="card">
+          <div class="card-head"><h2>Conversation</h2><span id="det-turns" class="count"></span></div>
+          <div id="det-conversation" class="conversation det-conv"></div>
+        </div>
+        <div class="det-side">
+          <div class="card">
+            <div class="card-head"><h2>Checks</h2><span id="det-checks-count" class="count"></span></div>
+            <ul id="det-checks" class="checks"></ul>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>Storefront result</h2></div>
+            <dl id="det-shop" class="kv"></dl>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Audit trail</h2><span id="det-audit-count" class="count"></span></div>
+        <div class="table-wrap">
+          <table class="sessions-table">
+            <thead>
+              <tr><th scope="col">Time</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Entity</th></tr>
+            </thead>
+            <tbody id="det-audit"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-inner">Eliza Voice Shopping is a demonstration store. Test payments only.</div>
+  </footer>
+</body>
+</html>

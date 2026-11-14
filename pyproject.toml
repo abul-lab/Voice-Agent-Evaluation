@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voiceshop"
+version = "0.1.0"
+description = "Voice shopping agent evaluation harness: multi-agent routing, guardrails, driving safety, noise and speech checks, live monitor and release gates."
+requires-python = ">=3.11"
+readme = "README.md"
+# Runtime has zero third-party dependencies by design (supply-chain surface kept minimal).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.scripts]
+voiceshop = "voiceshop.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+voiceshop = ["monitor/static/*.html", "monitor/static/*.js", "monitor/static/*.css"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = ["slow: runs the full evaluation suite"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["build", "dist"]  # generated copies, not source
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = [
+  "S101",  # assert is used in tests
+  "E501",  # line length is advisory; formatter owns wrapping
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/voiceshop/simulation/*" = ["S311"]  # seeded, non-cryptographic simulation RNG by design
+"tests/*" = ["S104", "S310"]  # loopback test server
+"src/voiceshop/catalog/*" = ["S311"]  # seeded simulation RNG, as in simulation/

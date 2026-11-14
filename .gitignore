@@ -1,0 +1,20 @@
+
+# simulator
+.venv/
+results/
+*.db
+*.db-wal
+*.db-shm
+*.egg-info/
+
+# build output and caches
+build/
+dist/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# local secrets and environment files: never commit keys
+.env
+.env.*
+*.key

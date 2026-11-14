@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Cases · Eliza Voice Shopping</title>
+  <link rel="stylesheet" href="/monitor.css">
+  <script src="/tests.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3a4 4 0 0 0-4 4v4a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4Zm-6 8a6 6 0 0 0 12 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <div>
+          <h1>Eliza Voice Shopping</h1>
+          <p>Monitor · live voice shopping sessions</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Primary">
+        <a href="/">Monitor</a>
+        <a href="/tests" class="active" aria-current="page">Test Cases</a>
+        <a href="/history">Execution history</a>
+        <a href="/config">Configuration</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Test cases</h2>
+          <p class="muted small">Each case is a scripted caller with a fixed goal. The suite checks the outcome that results, such as the order, the refund decision or the handoff, not the wording of the reply.</p>
+        </div>
+        <span id="case-count" class="count"></span>
+      </div>
+
+      <nav class="subnav" role="tablist" aria-label="Test types">
+        <button type="button" role="tab" data-type="smoke" aria-selected="true">Smoke</button>
+        <button type="button" role="tab" data-type="targeted" aria-selected="false">Targeted regression</button>
+        <button type="button" role="tab" data-type="regression" aria-selected="false">Full regression</button>
+      </nav>
+
+      <p id="type-note" class="type-note"></p>
+
+      <div class="table-wrap">
+        <table class="cases">
+          <thead>
+            <tr>
+              <th scope="col">Case</th>
+              <th scope="col">What it verifies</th>
+              <th scope="col">Caller goal</th>
+              <th scope="col">Expected result</th>
+              <th scope="col">Turn budget</th>
+            </tr>
+          </thead>
+          <tbody id="case-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted small">Run these from the Monitor by choosing the test type and pressing Run tests.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-inner">Simulated voice channel with optional speech-recognition errors. Names and phone numbers are never written to logs.</div>
+  </footer>
+</body>
+</html>

@@ -378,3 +378,25 @@ def test_the_api_description_matches_the_routes_the_server_answers(live):
                 code, text = err.code, err.read()
             is_missing = code == 404 and b'"not_found"' in text and b"no such route" in text
             assert not is_missing, f"{method.upper()} {path} is in the description but the server has no such route"
+
+
+def test_a_suite_start_is_audited_with_the_request_id_that_started_it(ctx, tmp_path):
+    ring, keys = _ring(tmp_path)
+    app = MonitorApp(ctx, keys=ring, max_concurrent_runs=2, max_body_bytes=4096, store_bundle=_bundle(),
+                     settings_path=tmp_path / "monitor_settings.json")
+    base, server = _serve(app)
+    try:
+        req = urllib.request.Request(base + "/api/evals", data=json.dumps({"test_type": "smoke"}).encode(),
+                                     method="POST", headers={"Content-Type": "application/json",
+                                                             "X-API-Key": keys["tester"],
+                                                             "X-Request-Id": "req-corr-000001"})
+        with urllib.request.urlopen(req, timeout=5) as r:  # noqa: S310
+            batch = json.loads(r.read())["batch_id"]
+        events = [e for e in app.ctx.audit.list("monitor") if e["action"] == "suite.started"]
+        assert events and events[-1]["detail"]["request_id"] == "req-corr-000001"
+        assert events[-1]["entity_id"] == batch and events[-1]["actor"] == "tester"
+        app.drain(timeout_s=20)
+    finally:
+        server.shutdown()
+        server.server_close()
+        app.close()

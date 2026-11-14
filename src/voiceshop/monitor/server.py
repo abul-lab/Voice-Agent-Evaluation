@@ -208,8 +208,8 @@ class _Handler(ShopRoutes, BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------- plumbing
     def log_message(self, fmt: str, *args: Any) -> None:  # route to structured logger, without bodies
-        log.info("http", extra={"method": self.command, "path": urlparse(self.path).path,
-                                "client": self.client_address[0]})
+        log.info("http", extra={"request_id": getattr(self, "_request_id", None), "method": self.command,
+                                "path": urlparse(self.path).path, "client": self.client_address[0]})
 
     def _rid(self) -> str:
         incoming = self.headers.get("X-Request-Id", "")
@@ -369,6 +369,9 @@ class _Handler(ShopRoutes, BaseHTTPRequestHandler):
         if not self.app.try_acquire():
             return self._error(429, "busy", "too many runs in progress; retry later", path)
         batch = self.app.submit_store_suite(test_type, pace_ms, actor=principal.name)
+        # The audit entry carries the request id, so one identifier links the HTTP call, its log lines and the work.
+        self.app.ctx.audit.record("monitor", principal.name, "suite.started", batch,
+                                  request_id=self._request_id, test_type=test_type)
         return self._json(202, {"batch_id": batch, "runs": f"/api/runs?batch={batch}"}, path)
 
     # --------------------------------------------------------------- helpers

@@ -1,0 +1,7 @@
+{
+  "name": "voiceshop-e2e",
+  "private": true,
+  "description": "End-to-end checks of the monitor in a real browser",
+  "scripts": { "test": "node --test" },
+  "devDependencies": { "playwright": "^1.65.1" }
+}

@@ -18,3 +18,6 @@ __pycache__/
 .env
 .env.*
 *.key
+
+# end-to-end test dependencies and browser cache
+e2e/node_modules/

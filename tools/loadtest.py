@@ -21,7 +21,8 @@ import uuid
 
 def _call(url: str, method: str = "GET", body: dict | None = None, timeout: float = 10.0) -> tuple[int, float]:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(url, data=data, method=method,  # noqa: S310 - a loopback test target
+                                 headers={"Content-Type": "application/json"})
     started = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - the operator's own server

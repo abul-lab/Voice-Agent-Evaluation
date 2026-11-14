@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from voiceshop.catalog.model import Catalog
-from voiceshop.catalog.multiagent import Conductor
+from voiceshop.catalog.multiagent import FrontDeskRouter
 from voiceshop.catalog.store import StoreData, ToolGateway
 from voiceshop.evaluation import analysis
 from voiceshop.evaluation.judge import (
@@ -101,7 +101,7 @@ def test_the_router_reports_time_for_each_step(ctx):
     catalog = Catalog.load(DATA)
     store = StoreData(DATA)
     gw = ToolGateway(store, _NullAudit(), tenant="t", ledger=ctx.refunds)
-    cond = Conductor(catalog, store, gw, date(2026, 11, 16))
+    cond = FrontDeskRouter(catalog, store, gw, date(2026, 11, 16))
     reply = cond.respond("Where is my order NW-1002?")
     assert set(reply.stages) == {"understand_ms", "route_ms", "dispatch_ms"}
     assert all(v >= 0 for v in reply.stages.values())

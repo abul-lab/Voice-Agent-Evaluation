@@ -98,7 +98,7 @@ class StoreReply:
     stages: dict[str, float] = field(default_factory=dict)  # ms per step of this reply
 
 
-class Conductor:
+class FrontDeskRouter:
     """Routes each caller turn to one specialist and returns that specialist's reply."""
 
     def __init__(self, catalog: Catalog, store: StoreData, gateway: ToolGateway, today: date,

@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 from voiceshop.catalog.model import Catalog
-from voiceshop.catalog.multiagent import Conductor
+from voiceshop.catalog.multiagent import FrontDeskRouter
 from voiceshop.catalog.store import StoreData, ToolGateway
 from voiceshop.config import load_settings
 from voiceshop.context import build_context
@@ -52,9 +52,9 @@ def main() -> int:
     ctx = build_context(settings, ROOT / "results" / "speech_check.db")
     catalog, store = Catalog.load(DATA), StoreData(DATA)
 
-    def new_front_desk() -> Conductor:
+    def new_front_desk() -> FrontDeskRouter:
         gateway = ToolGateway(store, ctx.audit, tenant="speech-frontdesk", ledger=ctx.refunds)
-        return Conductor(catalog, store, gateway, TODAY)
+        return FrontDeskRouter(catalog, store, gateway, TODAY)
 
     try:
         greeting = new_front_desk().greet()

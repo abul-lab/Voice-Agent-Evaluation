@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from voiceshop.catalog.model import Catalog, Product
-from voiceshop.catalog.multiagent import Conductor
+from voiceshop.catalog.multiagent import FrontDeskRouter
 from voiceshop.catalog.shop import ShopSessions
 from voiceshop.catalog.shopper import GOALS, Goal, ShopperSimulator
 from voiceshop.catalog.store import StoreData, ToolGateway
@@ -126,7 +126,7 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
     # The storefront session is keyed by the run id, so the page shows exactly this conversation's cart.
     gateway = ToolGateway(store, ctx.audit, tenant=run_id, ledger=ctx.refunds, faults=scenario.faults,
                           catalog=catalog, shops=shops)
-    conductor = Conductor(catalog, store, gateway, scenario.today, sessions=shops, sid=run_id)
+    conductor = FrontDeskRouter(catalog, store, gateway, scenario.today, sessions=shops, sid=run_id)
     rng = random.Random(scenario.seed)
     caller = ShopperSimulator(list(scenario.goals), rng, scenario.off_topic_first)
     asr = AsrNoise(scenario.asr_error_rate, rng)

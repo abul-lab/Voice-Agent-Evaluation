@@ -402,7 +402,7 @@ const HOP_FAST_MS = 170;  // used when messages arrive faster than they can be d
   }
 
   // Who is speaking right now. The playback in app.js calls this when a piece of speech really starts
-  // (voice on) or when its paced slot starts (voice off). A customer line passes null, so no agent blinks.
+  // (voice on) or when its paced time starts (voice off). A customer line passes null, so no agent blinks.
   // The blink stays on that agent until the next speaker starts.
   function speak(who) {
     const id = who === "router" ? "conductor" : who;

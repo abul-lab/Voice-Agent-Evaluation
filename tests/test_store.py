@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from voiceshop.catalog.model import Catalog
-from voiceshop.catalog.multiagent import Conductor
+from voiceshop.catalog.multiagent import FrontDeskRouter
 from voiceshop.catalog.store import SCOPES, StoreData, ToolDenied, ToolGateway
 from voiceshop.storage.repository import AuditLog, RefundLedger
 
@@ -31,7 +31,7 @@ def gateway(store, ctx):
 
 
 def _conductor(catalog, store, gateway):
-    return Conductor(catalog, store, gateway, TODAY)
+    return FrontDeskRouter(catalog, store, gateway, TODAY)
 
 
 def test_order_agent_cannot_issue_refunds(store, gateway, ctx):

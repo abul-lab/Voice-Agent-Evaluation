@@ -97,6 +97,22 @@ def ctx_for_prune(settings, db):
     return _bc(settings, db)
 
 
+def _start_retention(ctx, days: int) -> None:
+    """Remove transcripts older than ``days`` now, and again every 24 hours while the server runs."""
+    def sweep() -> None:
+        while True:
+            try:
+                result = ctx.runs.prune_older_than(days)
+                if result["runs"]:
+                    log.info("old transcripts removed", extra={"runs": result["runs"], "turns": result["turns"],
+                                                              "retention_days": days})
+            except Exception:  # isolation boundary: a failed sweep is logged and tried again tomorrow
+                log.exception("transcript retention sweep failed")
+            threading.Event().wait(24 * 3600)
+
+    threading.Thread(target=sweep, name="retention", daemon=True).start()
+
+
 def _judge_command(args) -> int:
     from voiceshop.evaluation.judge import (
         JudgeError,
@@ -272,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
                 settings_path=settings.db_path.parent / "monitor_settings.json",
             )
             server = make_server(app, args.host, args.port)
+            _start_retention(ctx, settings.retention_days)
 
             def _stop(signum, _frame):  # stop taking requests; the drain happens below, on the main thread
                 log.info("stop requested", extra={"signal": signum})

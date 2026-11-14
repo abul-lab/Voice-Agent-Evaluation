@@ -339,3 +339,13 @@ def test_a_changed_model_or_falling_agreement_is_reported_as_drift():
     assert any("agreement fell" in r for r in drift(base, {**base, "agreement": 0.3}))
     assert drift(base, {**base, "agreement": 0.47}) == []  # within the tolerance
     assert any("incomplete" in r for r in drift(base, {**base, "failures": 4}))
+
+
+def test_transcripts_are_kept_for_two_weeks_by_default(tmp_path):
+    from voiceshop.config import describe, load_settings, problems
+
+    settings = load_settings(env={"VOICESHOP_KEYS_FILE": str(tmp_path / "none.json")})
+    assert settings.retention_days == 14
+    assert describe(settings)["transcript_retention_days"] == 14
+    bad = load_settings(env={"VOICESHOP_RETENTION_DAYS": "0", "VOICESHOP_KEYS_FILE": str(tmp_path / "none.json")})
+    assert any("RETENTION_DAYS" in p for p in problems(bad))

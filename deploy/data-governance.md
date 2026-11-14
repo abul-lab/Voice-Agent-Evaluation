@@ -29,13 +29,17 @@ handles real customer data.
 - Storefront state and refunds are durable and survive restarts.
 - Secrets come from the environment only; `.env` files are git-ignored; `check-config` never prints values.
 
+## Decisions
+
+- **Transcript access (decided):** every role, including viewers, can read transcripts. The monitor reads them without a key. Revisit before any real customer data is used.
+- **Audit access (decided):** every role can read the audit trail, for the same reason. Revisit with the transcript decision.
+- **Transcript retention (decided):** 14 days. Set by `VOICESHOP_RETENTION_DAYS` (default 14). The server removes older transcripts at start-up and once a day. The audit trail is not removed.
+
 ## Gaps
 
-1. **Transcript access:** every role can read transcripts. Restrict transcript reading to the operator and admin roles, or add a `viewer` that sees metrics only.
-2. **Audit access:** restrict the audit endpoint to admins.
+1. **Access control on transcripts and audit:** see the decisions above; the controls for a real deployment are still to be designed.
 3. **Encryption at rest:** the database and key file are not encrypted by the application. Use encrypted disks.
 4. **Backups:** no backup is automated. Back up the database file while the server is stopped, or use SQLite's online backup.
 5. **Data subject requests:** there is no per-customer search or deletion. A real deployment needs one.
 6. **Lawful basis and privacy assessment:** not done. Required before any real customer data is used.
-7. **Retention schedule:** the prune command exists; no schedule is set and no period is chosen.
 8. **Logs in a collector:** no central log store is configured.

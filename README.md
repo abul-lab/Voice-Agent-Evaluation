@@ -216,7 +216,7 @@ voiceshop keys revoke --name qe-analyst
 Every start, stop, settings change and history clear is recorded against the person who did it, with the request id.
 Changes are rate limited per person, and requests are rate limited per client address.
 
-**Retention.** Old run transcripts can be removed; the audit trail is kept:
+**Retention.** Run transcripts are kept for 14 days (`VOICESHOP_RETENTION_DAYS`). The server removes older ones at start-up and once a day. The audit trail is kept. To remove them by hand:
 
 ```bash
 voiceshop prune --older-than-days 90 --dry-run

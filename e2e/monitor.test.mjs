@@ -100,6 +100,8 @@ test('the test cases page lists the three tiers', async () => {
 test('configuration refuses an address that is not a web address', async () => {
   const p = await page();
   await p.goto(`${base}/config`);
+  // The page fills the address box from the saved settings when they arrive; wait for that before typing.
+  await p.waitForLoadState('networkidle');
   await p.fill('#storefront-url', 'ftp://example.invalid/shop');
   await p.click('#storefront-save');
   await p.waitForFunction(() => document.querySelector('#config-msg')?.textContent.includes('must start with'),

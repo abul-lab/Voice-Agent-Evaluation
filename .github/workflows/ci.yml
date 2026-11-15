@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - name: Upgrade pip
+        # The runner's pip has published vulnerabilities, and the dependency audit scans every installed package.
+        run: python -m pip install --upgrade pip
       - name: Install
         run: pip install -e ".[dev]"
       - name: Lint

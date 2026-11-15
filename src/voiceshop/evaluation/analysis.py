@@ -20,6 +20,9 @@ FAILURE_CATEGORY: dict[str, str] = {
     "grounded_facts": "grounding",
     "refund_policy": "policy",
     "idempotent_refund": "policy",
+    "refund_confirmed_first": "policy",
+    "repair_ladder": "conduct",
+    "refund_declined_leaves_ledger_unchanged": "policy",
     "audit_trail": "policy",
     "escalation_code": "policy",
     "verification_gate": "verification",
@@ -137,6 +140,10 @@ def analyse(records: list[dict[str, Any]], summary: dict[str, Any]) -> dict[str,
     summary["security"] = security
     summary["latency_gate"] = latency
     summary["stage_latency_ms"] = stage_latency(records)
+    # Imported here: conversation_metrics uses the percentile helper from this module.
+    from voiceshop.evaluation.conversation_metrics import conversation_metrics
+
+    summary["conversation_metrics"] = conversation_metrics(records)
     gates = {
         "pass_rate": bool(summary["pass_rate"] >= summary["pass_threshold"]),
         "no_errors": summary["errors"] == 0,

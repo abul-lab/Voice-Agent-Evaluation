@@ -26,6 +26,7 @@ class RuntimeSettings:
     max_body_bytes: int
     trust_proxy: bool  # behind a reverse proxy: use X-Forwarded-For for per-client limits
     retention_days: int  # run transcripts older than this are removed (the audit trail is kept)
+    barge_in: bool = False  # caller speech stops agent playback (needs an audio channel; off by default)
 
 
 def _int(env: dict[str, str], name: str, default: int) -> int:
@@ -50,6 +51,7 @@ def load_settings(env: dict[str, str] | None = None) -> RuntimeSettings:
         max_body_bytes=_int(env, "VOICESHOP_MAX_BODY_BYTES", 65536),
         trust_proxy=env.get("VOICESHOP_TRUST_PROXY", "").lower() in ("1", "true", "yes"),
         retention_days=_int(env, "VOICESHOP_RETENTION_DAYS", 14),
+        barge_in=env.get("VOICESHOP_BARGE_IN", "").lower() in ("1", "true", "yes"),
     )
 
 
@@ -92,4 +94,5 @@ def describe(settings: RuntimeSettings) -> dict[str, Any]:
         "max_body_bytes": settings.max_body_bytes,
         "log_level": settings.log_level,
         "transcript_retention_days": settings.retention_days,
+        "barge_in": settings.barge_in,
     }

@@ -66,7 +66,16 @@ A repair ladder: ask again, then rephrase with options, then offer a human. Each
 Acceptance: a caller who is misunderstood three times is offered a handoff; the ladder is covered by
 scenarios in the suite; recovery turns are counted in the conversation metrics.
 
-### 3.3 Barge-in (planned, needs an audio channel)
+### 3.3 Barge-in (partly done, uncommitted: decision and timing built; no audio channel yet)
+Built: `src/voiceshop/speech/barge_in.py`. Given a reply being spoken and the time the caller starts, it decides
+whether the caller interrupts, when playback stops, and what the caller heard (the words said before the stop).
+Off by default (`VOICESHOP_BARGE_IN`, shown by `check-config`). Interruption metrics become measurable when a
+channel records `interrupted` on agent turns. Tests: `tests/test_barge_in.py` (9 tests).
+Not built: real audio capture, playback control in the browser, endpointing and streaming recognition, and the
+suite runs (text runs cannot overlap, so no suite scenario exercises this yet).
+Stop budget: 300 ms from the caller starting to speak. Detection and word timing are simulated, not measured.
+
+Original definition:
 Requires a channel interface with streaming recognition and endpointing. Caller speech stops agent playback
 and is handled as the next turn. Built behind a flag.
 Acceptance: an audio test case where the caller speaks over the agent; playback stops within a set time; the

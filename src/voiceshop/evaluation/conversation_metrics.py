@@ -49,6 +49,26 @@ def _escalated(conversation: list[dict[str, Any]]) -> bool:
     return any(t.get("speaker") == "agent" and t.get("act") in ESCALATION_ACTS for t in conversation)
 
 
+def _interruptions(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measurable only for turns a channel recorded as interrupted (see speech/barge_in.py). Text runs have
+    no overlapping speech, so they report that the number is unknown rather than zero."""
+    recorded = [t for r in records for t in r.get("conversation", []) if "interrupted" in t]
+    if not recorded:
+        return {"measurable": False, "count": None,
+                "reason": "no channel recorded overlapping speech; text runs have none (roadmap 3.3)"}
+    cut = [t for t in recorded if t.get("interrupted")]
+    latencies = [float(t["stop_latency_ms"]) for t in cut if t.get("stop_latency_ms") is not None]
+    within = [t for t in cut if t.get("within_budget")]
+    return {
+        "measurable": True,
+        "count": len(cut),
+        "agent_turns_recorded": len(recorded),
+        "interruption_rate": round(len(cut) / len(recorded), 4),
+        "stop_latency_p95_ms": _p(latencies, 95),
+        "within_stop_budget_rate": round(len(within) / len(cut), 4) if cut else None,
+    }
+
+
 def conversation_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     """Phase 1 metrics over every record in a suite."""
     total = len(records)
@@ -97,11 +117,7 @@ def conversation_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
             "caller_turns": caller_turns,
             "rate_per_caller_turn": round(correction_count / caller_turns, 4) if caller_turns else None,
         },
-        "interruptions": {
-            "measurable": False,
-            "count": None,
-            "reason": "the text channel has no overlapping speech; measurable with the audio channel (roadmap 3.3)",
-        },
+        "interruptions": _interruptions(records),
         "latency": {
             "turns": len(agent_latencies),
             "p50_ms": _p(agent_latencies, 50),

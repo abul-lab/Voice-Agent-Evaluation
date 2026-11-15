@@ -26,7 +26,7 @@ Read the [case study](docs/case-study.md) for the design decisions and what fail
 - **A four-agent store.** A Front Desk Specialist routes each caller to one of four specialists: Shopping, Order Tracking, Refunds and Customer Care. Specialists act only through a tool gateway that enforces per-agent scopes and writes an audit trail.
 - **A storefront** at `/shop`, which the voice agents shop through. Voice and clicks share one cart.
 - **A live monitor** at `/`: the storefront inside a device, the conversation, the agent network, test runs and results.
-- **A test suite** of 74 scripted callers in three tiers (below), with 23 named checks. 31 of the cases are red-team attacks. A separate barge-in test type (12 cases) interrupts the agents' replies.
+- **A test suite** of 74 scripted callers in three tiers (below), with 26 named checks. 31 of the cases are red-team attacks. A separate barge-in test type (12 cases) interrupts the agents' replies.
 - **Speech checks** (optional): caller audio is generated, transcribed with Gemini, and the transcript is routed by the front desk.
 - **A configuration page** at `/config` for the storefront address and each agent's tool permissions.
 
@@ -99,6 +99,7 @@ The regression gate (`voiceshop regress`) is separate: every case that passed in
 | Guardrails and security | `no_forbidden_act`, `no_forbidden_text`, `no_forbidden_tool_call` |
 | Resilience | `graceful_failure` (a timed-out back office is reported, never guessed) |
 | Conduct | `turn_budget`, `conversation_completed`, `escalation_code` |
+| Barge-in (separate test type) | `barge_in_timing_valid`, `barge_in_decision`, `barge_in_answered` |
 
 Checks read the transcript, the audit log and the store data. An agent's own statement that it did something is not accepted as evidence.
 

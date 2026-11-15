@@ -2083,6 +2083,318 @@
           "refund_approved"
         ]
       }
+    },
+    {
+      "id": "barge_in_interrupt_david_min150",
+      "description": "Barge-in through the agent: a real interruption (david voice) interrupts the first reply; minimum speech 150 ms. Expected: stop.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 302,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_david_1.wav",
+        "min_speech_ms": 150
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_interrupt_david_min300",
+      "description": "Barge-in through the agent: a real interruption (david voice) interrupts the first reply; minimum speech 300 ms. Expected: stop.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 303,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_david_1.wav",
+        "min_speech_ms": 300
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_interrupt_david_min600",
+      "description": "Barge-in through the agent: a real interruption (david voice) interrupts the first reply; minimum speech 600 ms. Expected: stop.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 304,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_david_1.wav",
+        "min_speech_ms": 600
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_backchannel_david_min150",
+      "description": "Barge-in through the agent: a backchannel (david voice) interrupts the first reply; minimum speech 150 ms. Expected: continue.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 305,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "backchannel_david_1.wav",
+        "min_speech_ms": 150
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_backchannel_david_min300",
+      "description": "Barge-in through the agent: a backchannel (david voice) interrupts the first reply; minimum speech 300 ms. Expected: continue.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 306,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "backchannel_david_1.wav",
+        "min_speech_ms": 300
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_backchannel_david_min600",
+      "description": "Barge-in through the agent: a backchannel (david voice) interrupts the first reply; minimum speech 600 ms. Expected: continue.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 307,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "backchannel_david_1.wav",
+        "min_speech_ms": 600
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_interrupt_zira_min150",
+      "description": "Barge-in through the agent: a real interruption (zira voice) interrupts the first reply; minimum speech 150 ms. Expected: stop.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 308,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_zira_1.wav",
+        "min_speech_ms": 150
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_interrupt_zira_min300",
+      "description": "Barge-in through the agent: a real interruption (zira voice) interrupts the first reply; minimum speech 300 ms. Expected: stop.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 309,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_zira_1.wav",
+        "min_speech_ms": 300
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_interrupt_zira_min600",
+      "description": "Barge-in through the agent: a real interruption (zira voice) interrupts the first reply; minimum speech 600 ms. Expected: stop.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 310,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_zira_1.wav",
+        "min_speech_ms": 600
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_backchannel_zira_min150",
+      "description": "Barge-in through the agent: a backchannel (zira voice) interrupts the first reply; minimum speech 150 ms. Expected: continue.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 311,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "backchannel_zira_1.wav",
+        "min_speech_ms": 150
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_backchannel_zira_min300",
+      "description": "Barge-in through the agent: a backchannel (zira voice) interrupts the first reply; minimum speech 300 ms. Expected: continue.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 312,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "backchannel_zira_1.wav",
+        "min_speech_ms": 300
+      },
+      "expect": {}
+    },
+    {
+      "id": "barge_in_backchannel_zira_min600",
+      "description": "Barge-in through the agent: a backchannel (zira voice) interrupts the first reply; minimum speech 600 ms. Expected: continue.",
+      "tags": [
+        "barge_in"
+      ],
+      "seed": 313,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "backchannel_zira_1.wav",
+        "min_speech_ms": 600
+      },
+      "expect": {}
     }
   ]
 }

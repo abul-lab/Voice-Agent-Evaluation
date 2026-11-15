@@ -29,6 +29,7 @@ from voiceshop.evaluation.harness import aggregate, write_reports
 from voiceshop.evaluation.invariants import dialogue_violations
 from voiceshop.simulation.asr import AsrNoise
 from voiceshop.simulation.conversation import TurnRecord, run_conversation
+from voiceshop.speech.barge_in_turns import BargeInAgent, BargeInCaller, BargeInSpec, clips_dir_from_env
 
 log = logging.getLogger("voiceshop.storerun")
 DISCLOSING = {"order_status", "refund_approved", "refund_refused"}
@@ -51,7 +52,18 @@ class StoreScenario:
     goals: tuple[Goal, ...]
     expect: dict[str, Any]
     ambient: str | None = None  # background sound the speech recogniser also picks up, e.g. "car passing by"
+    barge_in: dict[str, Any] | None = None  # interrupt one agent reply with a caller clip (see barge_in_turns)
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+def _barge_in(raw: dict[str, Any] | None, sid: str) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    try:
+        BargeInSpec.from_dict(raw)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ScenarioError(f"{sid}: barge_in needs turn, interrupt_after_words, clip and min_speech_ms ({exc})") from exc
+    return dict(raw)
 
 
 def _goal(raw: dict[str, Any], sid: str) -> Goal:
@@ -89,6 +101,7 @@ def load_store_scenarios(path: Path) -> list[StoreScenario]:
             goals=tuple(_goal(g, sid) for g in raw["goals"]),
             expect=dict(raw.get("expect", {})),
             ambient=raw.get("ambient"),
+            barge_in=_barge_in(raw.get("barge_in"), sid),
         ))
     ids = [s.id for s in out]
     if len(ids) != len(set(ids)):
@@ -105,6 +118,7 @@ class StoreRun:
     error: str | None
     wall_ms: float
     shop: dict[str, Any] = field(default_factory=dict)  # final storefront state for this session
+    barge_in: dict[str, Any] | None = None  # the barge-in outcome, when the scenario has one
 
 
 class AmbientAsr:
@@ -132,6 +146,7 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
                                 classifier=classifier)
     rng = random.Random(scenario.seed)
     caller = ShopperSimulator(list(scenario.goals), rng, scenario.off_topic_first)
+    barge = None  # the agent wrapper, when this scenario interrupts a reply
     asr = AsrNoise(scenario.asr_error_rate, rng)
     if scenario.ambient:
         asr = AmbientAsr(asr, scenario.ambient)
@@ -147,7 +162,11 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
     started = _clock.perf_counter()
     end_reason = error = None
     try:
-        result = run_conversation(conductor, caller, asr, max_turns=scenario.max_turns, on_turn=emit)
+        agent_side, caller_side = conductor, caller
+        if scenario.barge_in is not None:
+            barge = BargeInAgent(conductor, BargeInSpec.from_dict(scenario.barge_in), clips_dir_from_env())
+            agent_side, caller_side = barge, BargeInCaller(caller, barge)
+        result = run_conversation(agent_side, caller_side, asr, max_turns=scenario.max_turns, on_turn=emit)
         end_reason = result.end_reason
     except Exception as exc:  # isolation boundary: the run is recorded as an error, the suite carries on
         error = f"{type(exc).__name__}: {exc}"
@@ -156,7 +175,8 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
     snap = shops.snapshot(run_id, catalog)
     shop_state = {"orders": snap["orders"], "cart": {line["id"]: line["qty"] for line in snap["cart"]},
                   "mode": snap["mode"], "page": snap["page"]}
-    return StoreRun(run_id, scenario, turns, end_reason, error, wall, shop_state)
+    outcome = barge.outcome.to_dict() if barge is not None and barge.outcome is not None else None
+    return StoreRun(run_id, scenario, turns, end_reason, error, wall, shop_state, barge_in=outcome)
 
 
 def _path(turns: list[TurnRecord]) -> list[str]:
@@ -166,6 +186,27 @@ def _path(turns: list[TurnRecord]) -> list[str]:
         if not out or out[-1] != a:
             out.append(a)
     return out
+
+
+def _barge_in_checks(run: StoreRun, agent_turns: list[TurnRecord]) -> list[Check]:
+    """Checks for a scenario that interrupts a reply. ``agent_turns[0]`` is the greeting, so reply n is
+    ``agent_turns[n]``."""
+    b = run.barge_in or {}
+    if not b.get("valid"):
+        return [Check("barge_in_timing_valid", False, b.get("invalid_reason") or "the interruption did not happen")]
+    checks = [Check("barge_in_timing_valid", True,
+                    f"caller spoke {b['caller_start_ms']:.0f} ms into a {b['words_total']}-word reply")]
+    expect_stop = b["expect"] == "stop"
+    did_stop = bool(b["cut"])
+    checks.append(Check("barge_in_decision", did_stop == expect_stop,
+                        f"{b['kind']} clip: agent {'stopped' if did_stop else 'kept talking'}, "
+                        f"expected {'stop' if expect_stop else 'continue'}"))
+    if did_stop:
+        after = agent_turns[b["turn"] + 1] if len(agent_turns) > b["turn"] + 1 else None
+        answered = after is not None and after.act != "error" and after.text_spoken != b["reply_text"]
+        checks.append(Check("barge_in_answered", answered,
+                            "the agent answered the interruption" if answered else "no new answer after the cut"))
+    return checks
 
 
 def evaluate_store_run(catalog: Catalog, store: StoreData, run: StoreRun, audit_entries: list[dict[str, Any]]):
@@ -364,6 +405,12 @@ def evaluate_store_run(catalog: Catalog, store: StoreData, run: StoreRun, audit_
     violations = dialogue_violations(turns)
     checks.append(Check("dialogue_invariants", not violations, "; ".join(violations) or "all conduct invariants held"))
 
+    if run.scenario.barge_in is not None:
+        if run.barge_in is None:
+            checks.append(Check("barge_in_timing_valid", False, "the agent never produced the reply to interrupt"))
+        else:
+            checks.extend(_barge_in_checks(run, agent_turns))
+
     per_agent: dict[str, int] = {}
     for t in agent_turns:
         if t.agent:
@@ -408,7 +455,11 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
                     shops: ShopSessions | None = None, source: str = "store", mode: str = "rules",
                     classifier=None) -> dict[str, Any]:
     batch_id = batch_id or datetime.now(UTC).strftime("store-%Y%m%dT%H%M%S")
-    selected = [s for s in scenarios if not tags or set(s.tags) & tags]
+    # Barge-in cases run only when asked for: they are a separate test type, not part of the regression baseline.
+    if tags:
+        selected = [s for s in scenarios if set(s.tags) & tags]
+    else:
+        selected = [s for s in scenarios if "barge_in" not in s.tags]
     records: list[dict[str, Any]] = []
     for scenario in selected:
         if stop_event is not None and stop_event.is_set():
@@ -419,7 +470,8 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
         checks, metrics = evaluate_store_run(catalog, store, run, audit)
         passed = run.error is None and all(c.passed for c in checks)
         status = "error" if run.error else ("passed" if passed else "failed")
-        summary = {"passed": passed, "checks": [c.to_dict() for c in checks], "outcome": metrics.get("path")}
+        summary = {"passed": passed, "checks": [c.to_dict() for c in checks], "outcome": metrics.get("path"),
+                   "barge_in": run.barge_in}
         if run.error:
             summary["error"] = run.error  # kept so the monitor can say why the case stopped
         ctx.runs.finish(run.run_id, status, summary)

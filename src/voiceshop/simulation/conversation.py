@@ -99,7 +99,8 @@ def run_conversation(
             speaker="agent",
             language=reply.language,
             text_spoken=reply.text,
-            text_heard=reply.text,
+            # A reply the caller cut off was only partly heard; the transcript keeps both.
+            text_heard=reply.text if getattr(reply, "heard", None) is None else reply.heard,
             act=reply.act,
             intent=reply.intent,
             latency_ms=reply.latency_ms,

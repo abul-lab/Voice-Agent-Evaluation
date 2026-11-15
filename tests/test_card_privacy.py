@@ -30,7 +30,9 @@ def test_a_long_number_that_fails_the_luhn_check_is_not_treated_as_a_card():
 
 
 def test_no_agent_reply_in_the_full_regression_contains_a_card_number(ctx):
-    scenarios = load_store_scenarios(ROOT / "scenarios" / "store_scenarios.json")
+    # The full regression tier: barge-in cases are a separate test type and are not part of it.
+    scenarios = [s for s in load_store_scenarios(ROOT / "scenarios" / "store_scenarios.json")
+                 if "barge_in" not in s.tags]
     report = run_store_suite(ctx, Catalog.load(DATA), StoreData(DATA), scenarios, threshold=0.9,
                              shops=ShopSessions())
     leaks = []

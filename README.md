@@ -1,6 +1,25 @@
 # Voice Agent Evaluation
 
-Release gates for a multi-agent voice shopping assistant. The shop is fictional (Eliza Voice Shopping). The point is the quality process: scripted callers exercise the agents, every result is checked against evidence (the transcript, the audit log and the store data), and a release gate decides whether a version can ship.
+[![ci](https://github.com/abul-lab/Voice-Agent-Evaluation/actions/workflows/ci.yml/badge.svg)](https://github.com/abul-lab/Voice-Agent-Evaluation/actions/workflows/ci.yml)
+
+**A quality process for a multi-agent voice shopping assistant.** Scripted callers exercise four specialist agents. Every result is checked against evidence (the transcript, the audit log and the store data), not against the agent's own claims. A release gate decides whether a version can ship. It is built with the Python standard library, has 151 tests, and runs 74 test cases in about a minute.
+
+![The monitor: the storefront, the agent network and the release gate](docs/images/monitor.png)
+
+| Screen | What it shows |
+|---|---|
+| Monitor | The storefront inside a device, the agents at work, and the live metrics |
+| [Execution history](docs/images/history.png) | Every run, its checks and its transcript |
+| [Configuration](docs/images/configuration.png) | Storefront address and each agent's tool permissions |
+
+**Try it in two commands**
+
+```bash
+pip install -e ".[dev]" && voiceshop eval --tags smoke        # one case, a few seconds
+VOICESHOP_LOCAL_UI_NO_KEY=1 voiceshop serve --host 127.0.0.1 --port 8765   # then open http://127.0.0.1:8765
+```
+
+Read the [case study](docs/case-study.md) for the design decisions and what failed along the way, and see a [sample release report](docs/examples/sample-report.md) without running anything.
 
 ## What is in the repository
 
@@ -253,7 +272,7 @@ up to 30 seconds. Runs still marked running after a restart are recorded as inte
 |---|---|---|
 | Unit, integration, security and fault tests | `pytest -q --cov=voiceshop` | 80% line coverage; CI requires 75% |
 | Dependency vulnerabilities | `pip-audit --skip-editable` | no known vulnerabilities (CI) |
-| Browser end-to-end checks (rules router only) | `cd e2e && npm install && npx playwright install chromium && npm test` | six checks; CI job |
+| Browser end-to-end checks (rules router only) | `cd e2e && npm install && npx playwright install chromium && npm test` | eight checks; CI job |
 | Load (storefront) | `python tools/loadtest.py --workers 20 --requests 50` | recorded in `deploy/load-results.md` |
 | Judge drift against the accepted reference | `voiceshop judge-drift --current <calibration.json>` | reference is the local model's current behaviour |
 

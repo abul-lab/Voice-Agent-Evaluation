@@ -34,6 +34,9 @@ FAILURE_CATEGORY: dict[str, str] = {
     "conversation_completed": "conduct",
     "dialogue_invariants": "conduct",
     "turn_budget": "conduct",
+    "barge_in_timing_valid": "conduct",
+    "barge_in_decision": "conduct",
+    "barge_in_answered": "conduct",
 }
 
 # Goal groups for completion metrics. A case belongs to every group whose tag it carries.

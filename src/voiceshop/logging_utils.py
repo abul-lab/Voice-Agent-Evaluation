@@ -68,6 +68,6 @@ def configure_logging(level: str = "INFO") -> None:
     handler.addFilter(RedactionFilter())
     root = logging.getLogger()
     root.handlers[:] = [handler]
-    root.setLevel(level)
+    root.setLevel(getattr(logging, level.upper(), logging.INFO))
     # Keep third-party noise out of the audit trail.
     logging.getLogger("urllib3").setLevel(logging.WARNING)

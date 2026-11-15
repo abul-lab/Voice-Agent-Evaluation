@@ -32,6 +32,7 @@ from voiceshop.speech.barge_in_timeline import (
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CLIPS = ROOT / "results" / "barge-in" / "clips"
+BUNDLED_CLIPS = ROOT / "data" / "barge_in" / "clips"
 
 
 class BargeInSetupError(RuntimeError):
@@ -105,6 +106,12 @@ class BargeInAgent:
     _samples: list[float] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
+        if (
+            self.clips_dir == DEFAULT_CLIPS
+            and not (self.clips_dir / "manifest.json").exists()
+            and (BUNDLED_CLIPS / "manifest.json").exists()
+        ):
+            self.clips_dir = BUNDLED_CLIPS
         self._entry = _manifest_entry(self.clips_dir, self.spec.clip)
         path = self.clips_dir / self.spec.clip
         if not path.exists():
@@ -191,4 +198,9 @@ class BargeInCaller:
 
 
 def clips_dir_from_env() -> Path:
-    return Path(os.environ.get("VOICESHOP_BARGE_IN_CLIPS", DEFAULT_CLIPS))
+    env_dir = os.environ.get("VOICESHOP_BARGE_IN_CLIPS")
+    if env_dir:
+        return Path(env_dir)
+    if (DEFAULT_CLIPS / "manifest.json").exists() or not (BUNDLED_CLIPS / "manifest.json").exists():
+        return DEFAULT_CLIPS
+    return BUNDLED_CLIPS

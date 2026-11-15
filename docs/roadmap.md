@@ -66,14 +66,10 @@ A repair ladder: ask again, then rephrase with options, then offer a human. Each
 Acceptance: a caller who is misunderstood three times is offered a handoff; the ladder is covered by
 scenarios in the suite; recovery turns are counted in the conversation metrics.
 
-### 3.3 Barge-in (partly done, 56a3441: decision and timing built; no audio channel yet)
-Built: `src/voiceshop/speech/barge_in.py`. Given a reply being spoken and the time the caller starts, it decides
-whether the caller interrupts, when playback stops, and what the caller heard (the words said before the stop).
-Off by default (`VOICESHOP_BARGE_IN`, shown by `check-config`). Interruption metrics become measurable when a
-channel records `interrupted` on agent turns. Tests: `tests/test_barge_in.py` (9 tests).
-Not built: real audio capture, playback control in the browser, endpointing and streaming recognition, and the
-suite runs (text runs cannot overlap, so no suite scenario exercises this yet).
-Stop budget: 300 ms from the caller starting to speak. Detection and word timing are simulated, not measured.
+### 3.3 Barge-in (partly done, 56a3441 & 50133a1: agent-driven test type and audio-clock timing built; no live audio channel yet)
+Built: `src/voiceshop/speech/barge_in.py`, `barge_in_timeline.py`, `barge_in_turns.py`, and `evaluation/barge_in_scoring.py`. Given a reply being spoken and a caller audio clip (`data/barge_in/clips/`), it runs the 128-frame energy detector on the caller's audio, decides whether and when playback cuts, records the words heard before the cut, and continues the conversation through the real agents (12 cases in the `barge_in` test type, plus 1 `barge_in_demo` case; see `docs/barge-in-measurement.md`).
+Off by default in live playback (`VOICESHOP_BARGE_IN`, shown by `check-config`). Tests: `tests/test_barge_in*.py`.
+Not built: live microphone capture, echo handling, browser playback cut, and streaming speech recognition.
 
 Original definition:
 Requires a channel interface with streaming recognition and endpointing. Caller speech stops agent playback

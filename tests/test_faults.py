@@ -22,7 +22,9 @@ DATA = Path(__file__).resolve().parents[1] / "data" / "catalog" / "northwind_out
 def test_a_failed_migration_is_rolled_back_and_the_version_is_unchanged(tmp_path, monkeypatch):
     path = tmp_path / "migrate.db"
     dbmod.migrate(path)
-    before = sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0]
+    conn0 = sqlite3.connect(path)
+    before = conn0.execute("PRAGMA user_version").fetchone()[0]
+    conn0.close()
     migrations = dict(dbmod._MIGRATIONS)
     migrations[before + 1] = ["CREATE TABLE ok_part (x INTEGER)", "THIS IS NOT SQL"]
     monkeypatch.setattr(dbmod, "_MIGRATIONS", migrations)

@@ -1,0 +1,184 @@
+﻿[
+    {
+        "clip":  "agent_reply.wav",
+        "kind":  "agent",
+        "expect":  "",
+        "voice":  "David",
+        "text":  "Hi, welcome to Eliza Voice Shopping. I can help you find gear, add it to your cart, check out, track an order or request a refund. You can also browse tents, sleeping bags, backpacks and stoves. What would you like to do today?"
+    },
+    {
+        "clip":  "interrupt_david_1.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "Wait, I want the Ridgeline tent instead."
+    },
+    {
+        "clip":  "interrupt_david_2.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "Actually, can you check my order first?"
+    },
+    {
+        "clip":  "interrupt_david_3.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "No, not that one, the blue one."
+    },
+    {
+        "clip":  "interrupt_david_4.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "Hold on, I need to change the quantity."
+    },
+    {
+        "clip":  "interrupt_david_5.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "Sorry, can I ask about a refund?"
+    },
+    {
+        "clip":  "interrupt_david_6.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "Stop, that is not what I asked."
+    },
+    {
+        "clip":  "backchannel_david_1.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "David",
+        "text":  "Mm-hmm."
+    },
+    {
+        "clip":  "backchannel_david_2.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "David",
+        "text":  "Yeah, right."
+    },
+    {
+        "clip":  "backchannel_david_3.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "David",
+        "text":  "Okay."
+    },
+    {
+        "clip":  "backchannel_david_4.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "David",
+        "text":  "Uh-huh."
+    },
+    {
+        "clip":  "backchannel_david_5.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "David",
+        "text":  "Right, okay."
+    },
+    {
+        "clip":  "backchannel_david_6.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "David",
+        "text":  "I see."
+    },
+    {
+        "clip":  "interrupt_zira_1.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "Zira",
+        "text":  "Wait, I want the Ridgeline tent instead."
+    },
+    {
+        "clip":  "interrupt_zira_2.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "Zira",
+        "text":  "Actually, can you check my order first?"
+    },
+    {
+        "clip":  "interrupt_zira_3.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "Zira",
+        "text":  "No, not that one, the blue one."
+    },
+    {
+        "clip":  "interrupt_zira_4.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "Zira",
+        "text":  "Hold on, I need to change the quantity."
+    },
+    {
+        "clip":  "interrupt_zira_5.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "Zira",
+        "text":  "Sorry, can I ask about a refund?"
+    },
+    {
+        "clip":  "interrupt_zira_6.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "Zira",
+        "text":  "Stop, that is not what I asked."
+    },
+    {
+        "clip":  "backchannel_zira_1.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "Zira",
+        "text":  "Mm-hmm."
+    },
+    {
+        "clip":  "backchannel_zira_2.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "Zira",
+        "text":  "Yeah, right."
+    },
+    {
+        "clip":  "backchannel_zira_3.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "Zira",
+        "text":  "Okay."
+    },
+    {
+        "clip":  "backchannel_zira_4.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "Zira",
+        "text":  "Uh-huh."
+    },
+    {
+        "clip":  "backchannel_zira_5.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "Zira",
+        "text":  "Right, okay."
+    },
+    {
+        "clip":  "backchannel_zira_6.wav",
+        "kind":  "backchannel",
+        "expect":  "continue",
+        "voice":  "Zira",
+        "text":  "I see."
+    },
+    {
+        "clip":  "interrupt_um_nah.wav",
+        "kind":  "interrupt",
+        "expect":  "stop",
+        "voice":  "David",
+        "text":  "Um, nah. Show me the Summit dome instead."
+    }
+]

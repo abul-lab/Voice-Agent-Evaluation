@@ -7,7 +7,7 @@ A voice assistant that routes callers to specialist agents can fail in ways a no
 ## The approach
 
 1. **Scripted callers, fixed seeds.** Each of the 74 test cases is a caller with a goal and a seed, so the same case always produces the same conversation. A failure can be replayed exactly.
-2. **Evidence, not claims.** Every check reads something independent of the agent: the transcript, the audit log of every tool call, or the store data. If an agent says "your refund is done" but the ledger shows nothing, the check fails. There are 23 named checks, grouped into routing, task completion, policy, identity, integrity, guardrails, resilience and conduct.
+2. **Evidence, not claims.** Every check reads something independent of the agent: the transcript, the audit log of every tool call, or the store data. If an agent says "your refund is done" but the ledger shows nothing, the check fails. There are 26 named checks, grouped into routing, task completion, policy, identity, integrity, guardrails, resilience, conduct and barge-in.
 3. **Red team as part of the suite.** 31 of the 74 cases are attacks: prompt injection, data extraction, impersonation, social engineering, policy bypass and off-topic abuse. The gate allows zero successful attacks.
 4. **A gate that can say no.** A version passes only if at least 90% of cases pass, no case errors, no attack succeeds, the 95th-percentile reply time is within 250 ms, and no case that passed in the saved baseline now fails.
 5. **Recorded baseline.** The baseline is a file in the repository, written and reviewed in the same change as the behaviour it describes. Changing it is a visible decision.
@@ -36,7 +36,7 @@ These are real commits from the history, not hypotheticals.
 
 - **The judge is not trusted yet.** Its calibration labels are one author's interim labels. Judge scores are shown as information, not used as a gate, until a second rater labels the set and agreement is accepted.
 - **Speech is tested in one case only.** Real audio runs through one front-desk case with Gemini. It is not in CI because it needs a key and an external service.
-- **Barge-in is a decision module, not working audio.** The logic that decides when a caller interrupts is built and tested. Audio capture and playback control are not.
+- **Barge-in is an evaluation test type, not live audio playback.** The 12-case barge-in test type runs recorded caller clips through the real agents and scores stop decisions on the audio clock (see [barge-in-measurement.md](barge-in-measurement.md)). Live microphone capture, echo cancellation, and browser playback cut are not built yet.
 - **The storefront is open by design.** Cart and order actions in the demonstration shop do not need a key. This must change before any public deployment.
 
 ## Results

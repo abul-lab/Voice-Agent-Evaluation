@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/abul-lab/Voice-Agent-Evaluation/actions/workflows/ci.yml/badge.svg)](https://github.com/abul-lab/Voice-Agent-Evaluation/actions/workflows/ci.yml)
 
-**A quality process for a multi-agent voice shopping assistant.** Scripted callers exercise four specialist agents. Every result is checked against evidence (the transcript, the audit log and the store data), not against the agent's own claims. A release gate decides whether a version can ship. It is built with the Python standard library, has 175 tests, and runs 74 test cases in about a minute.
+**A quality process for a multi-agent voice shopping assistant.** Scripted callers exercise four specialist agents. Every result is checked against evidence (the transcript, the audit log and the store data), not against the agent's own claims. A release gate decides whether a version can ship. It is built with the Python standard library, has 179 tests, and runs 74 test cases in about a minute.
 
 ![The monitor: the storefront, the agent network and the release gate](docs/images/monitor.png)
 
@@ -20,6 +20,17 @@ VOICESHOP_LOCAL_UI_NO_KEY=1 voiceshop serve --host 127.0.0.1 --port 8765   # the
 ```
 
 Read the [case study](docs/case-study.md) for the design decisions and what failed along the way, and see a [sample release report](docs/examples/sample-report.md) without running anything.
+
+## Quality engineering highlights
+
+| Pillar | How it is built here |
+|---|---|
+| **Independent oracles** | Every check verifies three sources the agent cannot falsify: the transcript, the append-only SQLite audit log, and the store's back-office state (`src/voiceshop/catalog/storerun.py`). |
+| **Deterministic simulation** | Seeded caller goals, synthetic ASR and ambient-noise models, injectable back-office faults (`ToolFault`), and bundled caller audio clips make every failure reproducible (`scenarios/store_scenarios.json`). |
+| **Least-privilege tool gateway** | Specialist agents have explicit tool scopes; unauthorized calls are refused and audited, and database triggers forbid editing or deleting audit events (`src/voiceshop/catalog/store.py`, `src/voiceshop/storage/db.py`). |
+| **Multi-gate release governance** | A release requires pass rate, zero errors, zero red-team successes, p95 reply latency within budget, and zero regressions against the committed baseline (`voiceshop regress`). |
+| **Epistemic discipline on LLM judges** | Rubric grading is paired with human calibration (`voiceshop calibrate`) and model/agreement drift detection (`voiceshop judge-drift`), and is kept advisory until inter-rater agreement is met. |
+| **Zero runtime dependencies** | The agents, monitor server, SSE streaming, RBAC keyring, Luhn card masking, and Prometheus `/metrics` endpoint use only the Python 3.11+ standard library (`pyproject.toml`). |
 
 ## What is in the repository
 
@@ -114,12 +125,12 @@ The regression gate (`voiceshop regress`) is separate: every case that passed in
 |---|---|
 | Routing and handoff | `routing_correct`, `dialogue_invariants` |
 | Task completion | `task_completed`, `commerce_task`, `recommendations_fit`, `grounded_facts` |
-| Policy | `refund_policy`, `idempotent_refund`, `audit_trail` |
+| Policy | `refund_policy`, `refund_confirmed_first`, `refund_declined_leaves_ledger_unchanged`, `idempotent_refund`, `audit_trail` |
 | Identity and disclosure | `verification_gate`, `no_repeat_verification` |
 | Integrity | `cart_consistency`, `confirmation_before_order` |
 | Guardrails and security | `no_forbidden_act`, `no_forbidden_text`, `no_forbidden_tool_call` |
 | Resilience | `graceful_failure` (a timed-out back office is reported, never guessed) |
-| Conduct | `turn_budget`, `conversation_completed`, `escalation_code` |
+| Conduct | `turn_budget`, `conversation_completed`, `escalation_code`, `repair_ladder` |
 | Barge-in (separate test type) | `barge_in_timing_valid`, `barge_in_decision`, `barge_in_answered` |
 
 Checks read the transcript, the audit log and the store data. An agent's own statement that it did something is not accepted as evidence.
@@ -308,7 +319,7 @@ up to 30 seconds. Runs still marked running after a restart are recorded as inte
 
 | Check | Command | Status |
 |---|---|---|
-| Unit, integration, security and fault tests | `pytest -q --cov=voiceshop` | 80% line coverage; CI requires 75% |
+| Unit, integration, security and fault tests | `pytest -q --cov=voiceshop` | 90% line coverage; CI requires 75% |
 | Dependency vulnerabilities | `pip-audit --skip-editable` | no known vulnerabilities (CI) |
 | Browser end-to-end checks (rules router only) | `cd e2e && npm install && npx playwright install chromium && npm test` | eight checks; CI job |
 | Load (storefront) | `python tools/loadtest.py --workers 20 --requests 50` | recorded in `deploy/load-results.md` |

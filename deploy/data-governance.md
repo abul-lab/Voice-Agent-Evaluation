@@ -7,7 +7,7 @@ handles real customer data.
 
 | Data | Where | Why it is kept | Who can read it | Retention |
 |---|---|---|---|---|
-| Test-run transcripts (every caller and agent line, heard text, timings) | `runs`, `turns` tables (SQLite file) | Evaluation evidence and reports | Any role, including `viewer` (**gap**: transcripts are visible to all roles) | `voiceshop prune --older-than-days N` (manual or scheduled; **gap**: no schedule is set) |
+| Test-run transcripts (every caller and agent line, heard text, timings) | `runs`, `turns` tables (SQLite file) | Evaluation evidence and reports | Any role, including `viewer` (**gap**: transcripts are visible to all roles) | 14 days by default (`VOICESHOP_RETENTION_DAYS`), swept at start-up and every 24 hours; manual prune via `voiceshop prune --older-than-days N` |
 | Audit trail (who started a suite, changed settings, cleared history, approved refunds) | `audit_events` table | Compliance record | Read through the API by any role (**gap**: restrict to admins) | Kept indefinitely; the database refuses edits and deletes |
 | Approved refunds | `refunds` table | Prevents a second approval for the same order | Internal only | Kept with the audit trail |
 | Storefront sessions (carts, orders, saved address, test card) | `shop_sessions` table | Lets a shopper resume | Shoppers' own session only (by id) | Removed after 24 hours without change |
@@ -38,8 +38,8 @@ handles real customer data.
 ## Gaps
 
 1. **Access control on transcripts and audit:** see the decisions above; the controls for a real deployment are still to be designed.
-3. **Encryption at rest:** the database and key file are not encrypted by the application. Use encrypted disks.
-4. **Backups:** no backup is automated. Back up the database file while the server is stopped, or use SQLite's online backup.
-5. **Data subject requests:** there is no per-customer search or deletion. A real deployment needs one.
-6. **Lawful basis and privacy assessment:** not done. Required before any real customer data is used.
-8. **Logs in a collector:** no central log store is configured.
+2. **Encryption at rest:** the database and key file are not encrypted by the application. Use encrypted disks.
+3. **Backups:** no backup is automated. Back up the database file while the server is stopped, or use SQLite's online backup.
+4. **Data subject requests:** there is no per-customer search or deletion. A real deployment needs one.
+5. **Lawful basis and privacy assessment:** not done. Required before any real customer data is used.
+6. **Logs in a collector:** no central log store is configured.

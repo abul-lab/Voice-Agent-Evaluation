@@ -491,7 +491,7 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
             "scenario_id": scenario.id,
             "language": "en",
             "tags": list(scenario.tags),
-            "mode": "rules",
+            "mode": mode,
             "passed": passed,
             "status": status,
             "checks": [c.to_dict() for c in checks],
@@ -517,7 +517,7 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
     report = {
         "batch_id": batch_id,
         "domain": "store",
-        "mode": "rules",
+        "mode": mode,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "summary": summary,
         "failures": [

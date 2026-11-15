@@ -4,12 +4,15 @@ import pytest
 
 from voiceshop.simulation.conversation import CustomerUtterance
 from voiceshop.speech.barge_in_turns import (
+    BUNDLED_CLIPS,
     DEFAULT_CLIPS,
     BargeInAgent,
     BargeInCaller,
     BargeInSetupError,
     BargeInSpec,
 )
+
+HAS_CLIPS = (DEFAULT_CLIPS / "manifest.json").exists() or (BUNDLED_CLIPS / "manifest.json").exists()
 
 REPLY = "Here is the Ridgeline two person tent for you at one hundred and eighty nine dollars today"
 
@@ -58,7 +61,7 @@ def test_the_default_clip_location_is_the_results_folder():
     assert DEFAULT_CLIPS.parent.name == "barge-in"
 
 
-@pytest.mark.skipif(not (DEFAULT_CLIPS / "manifest.json").exists(), reason="clips not generated (make_clips.ps1)")
+@pytest.mark.skipif(not HAS_CLIPS, reason="clips not generated (make_clips.ps1)")
 def test_an_interruption_cuts_the_reply_and_the_caller_says_it_next():
     spec = BargeInSpec(turn=1, interrupt_after_words=4, clip="interrupt_david_1.wav", min_speech_ms=150)
     agent = BargeInAgent(StubAgent(), spec)
@@ -79,7 +82,7 @@ def test_an_interruption_cuts_the_reply_and_the_caller_says_it_next():
     assert nxt.intent_label == "interrupt"
 
 
-@pytest.mark.skipif(not (DEFAULT_CLIPS / "manifest.json").exists(), reason="clips not generated (make_clips.ps1)")
+@pytest.mark.skipif(not HAS_CLIPS, reason="clips not generated (make_clips.ps1)")
 def test_a_backchannel_the_rule_ignores_leaves_the_conversation_unchanged():
     spec = BargeInSpec(turn=1, interrupt_after_words=4, clip="backchannel_david_1.wav", min_speech_ms=600)
     agent = BargeInAgent(StubAgent(), spec)
@@ -92,7 +95,7 @@ def test_a_backchannel_the_rule_ignores_leaves_the_conversation_unchanged():
     assert nxt.text == "Thanks, bye"  # the scripted caller carries on
 
 
-@pytest.mark.skipif(not (DEFAULT_CLIPS / "manifest.json").exists(), reason="clips not generated (make_clips.ps1)")
+@pytest.mark.skipif(not HAS_CLIPS, reason="clips not generated (make_clips.ps1)")
 def test_a_caller_who_speaks_after_the_reply_ended_is_an_invalid_case():
     short = StubAgent(text="Done.")
     spec = BargeInSpec(turn=1, interrupt_after_words=4, clip="interrupt_david_1.wav", min_speech_ms=150)

@@ -60,5 +60,14 @@ foreach ($voice in $voices) {
   }
 }
 
+# Demo clip for the video: a caller says "Um, nah." then pauses, then gives a new request.
+$demoSsml = '<speak version="1.0" xml:lang="en-US">Um, nah.<break time="900ms"/>Show me the Summit dome instead.</speak>'
+$demo = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$demo.SelectVoice('Microsoft David Desktop')
+$demo.SetOutputToWaveFile((Join-Path $dir 'interrupt_um_nah.wav'))
+$demo.SpeakSsml($demoSsml)
+$demo.Dispose()
+$entries += [pscustomobject]@{ clip = 'interrupt_um_nah.wav'; kind = 'interrupt'; expect = 'stop'; voice = 'David'; text = 'Um, nah. Show me the Summit dome instead.' }
+
 $entries | ConvertTo-Json -Depth 3 | Set-Content -Path (Join-Path $dir 'manifest.json') -Encoding utf8
 "wrote $($entries.Count) clips and manifest.json to $dir"

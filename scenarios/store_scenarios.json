@@ -2395,6 +2395,32 @@
         "min_speech_ms": 600
       },
       "expect": {}
+    },
+    {
+      "id": "barge_in_demo_um_nah",
+      "description": "Demo: the caller says 'Um, nah' mid-reply, pauses, then gives a new request.",
+      "tags": [
+        "barge_in_demo"
+      ],
+      "seed": 401,
+      "today": "2026-11-16",
+      "max_turns": 10,
+      "goals": [
+        {
+          "intent": "recommend",
+          "category_text": "tent",
+          "people": 2,
+          "budget": 250,
+          "verbose": true
+        }
+      ],
+      "barge_in": {
+        "turn": 1,
+        "interrupt_after_words": 4,
+        "clip": "interrupt_um_nah.wav",
+        "min_speech_ms": 150
+      },
+      "expect": {}
     }
   ]
 }

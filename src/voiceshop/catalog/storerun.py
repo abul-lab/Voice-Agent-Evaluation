@@ -465,7 +465,7 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
     if tags:
         selected = [s for s in scenarios if set(s.tags) & tags]
     else:
-        selected = [s for s in scenarios if "barge_in" not in s.tags]
+        selected = [s for s in scenarios if not any(t.startswith("barge_in") for t in s.tags)]
     records: list[dict[str, Any]] = []
     for scenario in selected:
         if stop_event is not None and stop_event.is_set():

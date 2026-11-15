@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from voiceshop.privacy import mask_card_numbers
 from voiceshop.storage.db import session, transaction
 
 
@@ -86,6 +87,9 @@ class RunRepository:
 
     def append_turn(self, run_id: str, turn: Any) -> None:
         data = asdict(turn)
+        # Caller speech can contain a card number; it is removed before the transcript is stored.
+        data["text_spoken"] = mask_card_numbers(data["text_spoken"])
+        data["text_heard"] = mask_card_numbers(data["text_heard"])
         with session(self._db) as conn:
             conn.execute(
                 """INSERT INTO turns (run_id, seq, speaker, language, text_spoken, text_heard, act, intent,

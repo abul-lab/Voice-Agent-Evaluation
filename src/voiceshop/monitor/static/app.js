@@ -495,6 +495,7 @@
       ["Started", fmt(run.created_at)],
       ["Finished", fmt(run.finished_at) || "—"],
     ];
+    if (run.summary && run.summary.error) rows.push(["Stopped because", String(run.summary.error)]);
     for (const [k, v] of rows) {
       dl.appendChild(el("dt", null, k));
       dl.appendChild(el("dd", null, v));
@@ -595,9 +596,12 @@
       renderOutcome(finished);
       $("exec-status").textContent = humanStatus(finished);
       $("exec-status").className = `badge ${finished.status}`;
-      $("exec-line").textContent = `Finished · ${state.steps} steps`;
-      $("sut-state").textContent = "Finished";
-      $("sut-state").className = "badge passed";
+      const failed = finished.status === "error";
+      $("exec-line").textContent = failed
+        ? `Stopped · ${state.steps} steps · ${(finished.summary && finished.summary.error) || "see Stopped because"}`
+        : `Finished · ${state.steps} steps`;
+      $("sut-state").textContent = failed ? "Stopped" : "Finished";
+      $("sut-state").className = `badge ${failed ? "error" : "passed"}`;
       await refreshRuns();
     });
     return undefined;

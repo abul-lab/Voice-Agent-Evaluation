@@ -419,8 +419,10 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
         checks, metrics = evaluate_store_run(catalog, store, run, audit)
         passed = run.error is None and all(c.passed for c in checks)
         status = "error" if run.error else ("passed" if passed else "failed")
-        ctx.runs.finish(run.run_id, status, {"passed": passed, "checks": [c.to_dict() for c in checks],
-                                             "outcome": metrics.get("path")})
+        summary = {"passed": passed, "checks": [c.to_dict() for c in checks], "outcome": metrics.get("path")}
+        if run.error:
+            summary["error"] = run.error  # kept so the monitor can say why the case stopped
+        ctx.runs.finish(run.run_id, status, summary)
         records.append({
             "run_id": run.run_id,
             "scenario_id": scenario.id,

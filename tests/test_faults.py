@@ -173,3 +173,23 @@ def test_a_crashing_scenario_is_recorded_as_an_error_with_its_traceback(ctx, mon
     assert run.error and "simulated router bug" in run.error  # recorded, not raised into the suite
     failed = [r for r in caplog.records if r.name == "voiceshop.storerun" and r.exc_info]
     assert failed, "the failure was logged with its traceback"
+
+
+def test_a_failed_case_keeps_its_error_text_in_the_saved_run(ctx, monkeypatch):
+    # The monitor shows the reason a case stopped; the reason must survive being saved.
+    from voiceshop.catalog import multiagent
+    from voiceshop.catalog.model import Catalog
+    from voiceshop.catalog.storerun import load_store_scenarios, run_store_suite
+
+    catalog = Catalog.load(DATA)
+    store = StoreData(DATA)
+    scenario = load_store_scenarios(Path(__file__).resolve().parents[1] / "scenarios" / "store_scenarios.json")[0]
+
+    def boom(self, utterance):
+        raise RuntimeError("simulated routing timeout")
+
+    monkeypatch.setattr(multiagent.FrontDeskRouter, "respond", boom)
+    run_store_suite(ctx, catalog, store, [scenario], threshold=0.9, batch_id="fault-1")
+    saved = [r for r in ctx.runs.list(limit=10) if r["batch_id"] == "fault-1"][0]
+    assert saved["status"] == "error"
+    assert "simulated routing timeout" in saved["summary"]["error"]

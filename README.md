@@ -30,6 +30,27 @@ Read the [case study](docs/case-study.md) for the design decisions and what fail
 - **Speech checks** (optional): caller audio is generated, transcribed with Gemini, and the transcript is routed by the front desk.
 - **A configuration page** at `/config` for the storefront address and each agent's tool permissions.
 
+## Capabilities
+
+What the project covers, and what it does not.
+
+| Area | What is covered |
+|---|---|
+| **Conversations** | Four specialist agents (Shopping, Order Tracking, Refunds, Customer Care) behind a Front Desk router: routing, handoffs, identity checks, refund read-back and confirmation, repair after misunderstanding, and storefront sessions shared with the caller's voice session. |
+| **Test types** | Smoke (1 case), Targeted regression (3), Full regression (74), Barge-in (12, through the real agents), and a Barge-in test (1). Every test type runs from the monitor's dropdown, or from the `voiceshop eval` command for the regression tiers. |
+| **Red team** | 31 attack cases in six groups: prompt injection, data extraction, impersonation, social engineering, policy bypass, and abuse with off-topic requests. The gate allows no successful attack. |
+| **Checks** | 26 named checks, each reading evidence the agent cannot write itself: the transcript, the audit log and the store data. They cover routing, verification, refund policy and confirmation, cart and order consistency, guardrails, graceful failure, conduct, and barge-in. |
+| **Release gate** | Pass rate, no errors, no successful attack, latency budget, and a regression check against a saved baseline (`voiceshop regress`). |
+| **Barge-in** | A caller interrupts an agent's reply. The stop decision runs on the caller's real audio, and the agent's reply is judged as spoken and as heard. Real interruptions and backchannels are tested at three minimum-speech settings. |
+| **Speech** | A speech round trip for one case, with recognition through Gemini. Barge-in timing uses synthetic speech, generated locally. |
+| **Judge** | An LLM judge with rubric scores and a calibration set. The calibration labels are one author's and are not trusted until a second rater has labelled them. |
+| **Monitor** | A live UI with test runs, storefront playback, agent network, transcripts, execution history, configuration, and an API with audit records. |
+| **Security** | Named API keys with roles (viewer, operator, admin), hashed keys, rate limits, an append-only audit trail, sign-in to read transcripts, masking of card numbers, and 14-day transcript retention. |
+| **Operations** | Container image, compose file, TLS proxy example, Prometheus alert rules checked with `promtool`, service levels, and data-governance notes. |
+| **Quality of the project** | Lint, unit and integration tests with a coverage floor, a dependency audit, the evaluation tiers and the regression gate, and browser checks, all run in CI. |
+
+**Not covered yet:** real phone audio and echo, real caller speech at scale, a calibrated judge, authentication on the storefront (it is open by design for this demonstration), and any production deployment.
+
 ## Quick start
 
 Requires Python 3.11 or later. The runtime has no third-party dependencies.
@@ -121,26 +142,41 @@ The judge runs on a local model (Ollama) for plumbing and integration checks. Th
 
 ## Architecture
 
-```
-Caller (simulated, or audio through speech services)
-   │  heard text (background tags are added here)
-   ▼
-Front Desk Specialist — rules router, no model
-   │  driving hold · guardrails · routing by cues
-   ├─► Shopping Agent ──────┐
-   ├─► Order Tracking ──────┤──► Tool gateway ──► Store back office
-   ├─► Refunds Agent ───────┤     • scopes per agent (least privilege)
-   └─► Customer Care ───────┘     • audit log for every call
-                                  • idempotent refunds, versioned policy
-   │
-   ▼
-Storefront sessions: cart, page, orders, history of every version
-   ▲  shared by the caller's voice session and the monitor
-Monitor: storefront · agent network · transcript · test runs
+```mermaid
+flowchart LR
+    caller["Caller<br/>scripted goals, caller clips"]
+    subgraph agents["Store agents"]
+        fd["Front Desk<br/>rules router (default) or Gemini"]
+        shop["Shopping"]
+        orders["Order Tracking"]
+        refunds["Refunds"]
+        care["Customer Care<br/>no tools"]
+    end
+    gw["Tool gateway<br/>scopes per agent, audit trail"]
+    store[("Store back office<br/>catalogue, orders, refund ledger")]
+    barge["Barge-in timing<br/>caller audio, reply timeline"]
+    checks["Checks<br/>transcript, audit log, store data"]
+    gate{{"Release gate"}}
+    monitor["Monitor<br/>UI, API, history"]
+    db[("SQLite<br/>runs, turns, audit")]
+
+    caller -- "text, or audio via the barge-in test" --> fd
+    barge -- "cut point, words heard" --> fd
+    fd --> shop & orders & refunds
+    fd --> care
+    shop & orders & refunds --> gw
+    gw --> store
+    fd -- "transcript" --> checks
+    gw -- "audit entries" --> checks
+    store -- "end state" --> checks
+    checks --> gate
+    monitor -- "starts suites, shows results" --> caller
+    checks --> db
+    monitor --> db
 ```
 
 - **Agents never touch data directly.** Every action goes through the gateway, which checks the agent's scopes and writes the audit trail. Customer Care has no tools.
-- **Routing is rules-based on purpose.** It is predictable and testable. The router is not a language model.
+- **The default router is rules-based.** It is predictable and testable. An optional Gemini router chooses the team for each message, and it is measured in the same way.
 - **Refunds follow a versioned policy.** Refusals cite a rule ID and the policy version.
 - **Identity is checked before any order details are given.** The order number and the email on the order must match.
 - **Driving safety is strict.** Once a caller says they are driving, the voice channel gives no shopping, order or refund help until they say they have parked. Only the goodbye is still accepted.

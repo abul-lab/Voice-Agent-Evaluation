@@ -188,7 +188,7 @@ class MonitorApp:
         classifier = GeminiRouteClassifier(self.gemini_key) if mode == "gemini" else None
 
         bundle = self.store_bundle or {}
-        tag_map = {"smoke": {"smoke"}, "targeted": {"targeted"}, "regression": set()}
+        tag_map = {"smoke": {"smoke"}, "targeted": {"targeted"}, "regression": set(), "barge_in": {"barge_in"}}
         batch_id = f"store-{uuid.uuid4().hex[:10]}"
         stop = threading.Event()
         self._cancels[batch_id] = stop
@@ -406,8 +406,8 @@ class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
                 return self._error(404, "not_found", "no running suite with that id", "/api/batches/{id}/cancel")
             return self._json(200, {"cancelled": True}, "/api/batches/{id}/cancel")
         test_type = body.get("test_type", "smoke")
-        if test_type not in ("smoke", "targeted", "regression"):
-            return self._error(400, "bad_request", "test_type must be smoke, targeted or regression", path)
+        if test_type not in ("smoke", "targeted", "regression", "barge_in"):
+            return self._error(400, "bad_request", "test_type must be smoke, targeted, regression or barge_in", path)
         mode = body.get("mode", "rules")
         if mode not in ("rules", "gemini"):
             return self._error(400, "bad_request", "mode must be rules or gemini", path)

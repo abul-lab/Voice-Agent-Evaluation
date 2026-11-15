@@ -68,6 +68,6 @@ class AdminRoutes:
                 "id": sc.id, "language": "en", "tags": list(sc.tags), "description": sc.description,
                 "intent": sc.goals[0].intent, "expected_outcome": outcome,
                 "max_turns": exp.get("max_turns", sc.max_turns),
-                "test_types": ["regression"] + [t for t in ("smoke", "targeted") if t in sc.tags],
+                "test_types": ["regression"] + [t for t in ("smoke", "targeted", "barge_in") if t in sc.tags],
             })
         return out

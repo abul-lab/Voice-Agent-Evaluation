@@ -193,3 +193,23 @@ def test_a_failed_case_keeps_its_error_text_in_the_saved_run(ctx, monkeypatch):
     saved = [r for r in ctx.runs.list(limit=10) if r["batch_id"] == "fault-1"][0]
     assert saved["status"] == "error"
     assert "simulated routing timeout" in saved["summary"]["error"]
+
+
+def test_a_stopped_suite_is_recorded_as_stopped_and_not_as_an_error(ctx):
+    from voiceshop.catalog.model import Catalog
+    from voiceshop.catalog.shop import ShopSessions
+    from voiceshop.catalog.storerun import load_store_scenarios, run_store_suite
+    from voiceshop.errors import VoiceShopError
+
+    catalog = Catalog.load(DATA)
+    store = StoreData(DATA)
+    scenarios = load_store_scenarios(Path(__file__).resolve().parents[1] / "scenarios" / "store_scenarios.json")[:1]
+
+    def stop_now(_turn):
+        raise VoiceShopError("suite cancelled", code="cancelled")
+
+    report = run_store_suite(ctx, catalog, store, scenarios, threshold=0.9, batch_id="stop-1",
+                             on_turn=stop_now, shops=ShopSessions())
+    saved = [r for r in ctx.runs.list(limit=10) if r["batch_id"] == "stop-1"][0]
+    assert saved["summary"]["cancelled"] is True
+    assert report["summary"]["errors"] == 0  # a stopped run is not a case that failed

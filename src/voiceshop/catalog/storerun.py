@@ -119,6 +119,7 @@ class StoreRun:
     wall_ms: float
     shop: dict[str, Any] = field(default_factory=dict)  # final storefront state for this session
     barge_in: dict[str, Any] | None = None  # the barge-in outcome, when the scenario has one
+    cancelled: bool = False  # the operator stopped the suite during this run; this is not an agent error
 
 
 class AmbientAsr:
@@ -161,6 +162,7 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
 
     started = _clock.perf_counter()
     end_reason = error = None
+    cancelled = False
     try:
         agent_side, caller_side = conductor, caller
         if scenario.barge_in is not None:
@@ -169,14 +171,18 @@ def run_store_scenario(ctx, catalog: Catalog, store: StoreData, scenario: StoreS
         result = run_conversation(agent_side, caller_side, asr, max_turns=scenario.max_turns, on_turn=emit)
         end_reason = result.end_reason
     except Exception as exc:  # isolation boundary: the run is recorded as an error, the suite carries on
-        error = f"{type(exc).__name__}: {exc}"
-        log.exception("scenario failed", extra={"run_id": run_id, "scenario_id": scenario.id})
+        if getattr(exc, "code", None) == "cancelled":
+            cancelled = True  # stopped by the operator: recorded as stopped, not as an agent error
+        else:
+            error = f"{type(exc).__name__}: {exc}"
+            log.exception("scenario failed", extra={"run_id": run_id, "scenario_id": scenario.id})
     wall = round((_clock.perf_counter() - started) * 1000, 1)
     snap = shops.snapshot(run_id, catalog)
     shop_state = {"orders": snap["orders"], "cart": {line["id"]: line["qty"] for line in snap["cart"]},
                   "mode": snap["mode"], "page": snap["page"]}
     outcome = barge.outcome.to_dict() if barge is not None and barge.outcome is not None else None
-    return StoreRun(run_id, scenario, turns, end_reason, error, wall, shop_state, barge_in=outcome)
+    return StoreRun(run_id, scenario, turns, end_reason, error, wall, shop_state, barge_in=outcome,
+                    cancelled=cancelled)
 
 
 def _path(turns: list[TurnRecord]) -> list[str]:
@@ -466,6 +472,11 @@ def run_store_suite(ctx, catalog: Catalog, store: StoreData, scenarios: list[Sto
             break
         run = run_store_scenario(ctx, catalog, store, scenario, source=source, mode=mode, classifier=classifier,
                                  batch_id=batch_id, on_turn=on_turn, shops=shops)
+        if run.cancelled:
+            # A stopped run is not evaluated and is not part of the suite's results.
+            ctx.runs.finish(run.run_id, "error", {"cancelled": True, "passed": False, "checks": [],
+                                                  "error": "stopped by the operator"})
+            break
         audit = ctx.audit.list(run.run_id)
         checks, metrics = evaluate_store_run(catalog, store, run, audit)
         passed = run.error is None and all(c.passed for c in checks)

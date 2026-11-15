@@ -69,7 +69,9 @@
     refund: "Refunds Agent", care: "Customer Care Agent",
   };
   const outcomeOf = (run) => (run.summary && run.summary.outcome) || "";
-  const humanStatus = (run) => ({ running: "Running", passed: "Passed", failed: "Failed", error: "Error" }[run.status] || run.status);
+  const isStopped = (run) => Boolean(run.summary && run.summary.cancelled);
+  const humanStatus = (run) => (isStopped(run) ? "Stopped"
+    : ({ running: "Running", passed: "Passed", failed: "Failed", error: "Error" }[run.status] || run.status));
   // "store_refund_approved_within_window" -> "Store refund approved within window"
   const prettyName = (id) => {
     const words = id.replace(/^(en|es|store|evs)_/, "").split("_");
@@ -260,7 +262,7 @@
       ["Pass rate", rate, passed && done.length ? "good" : ""],
       ["Passed", passed, "good"],
       ["Failed", count((r) => r.status === "failed"), "bad"],
-      ["Errors", count((r) => r.status === "error"), "bad"],
+      ["Errors", count((r) => r.status === "error" && !isStopped(r)), "bad"],
       ["Booked", count((r) => outcomeOf(r) === "booked"), ""],
       ["Cancelled", count((r) => outcomeOf(r) === "cancelled"), ""],
       ["Moved", count((r) => outcomeOf(r) === "rescheduled"), ""],

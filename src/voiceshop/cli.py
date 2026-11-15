@@ -234,6 +234,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "regress":
             from voiceshop.evaluation.regression import compare, load_json
 
+            if not args.report.exists():
+                print(
+                    f"no report at {args.report}; run `voiceshop eval` first or pass --report",
+                    file=sys.stderr,
+                )
+                return 2
             findings = compare(load_json(args.baseline), load_json(args.report))
             if not findings:
                 print("regression gate: PASS (no case regressed against the baseline)")

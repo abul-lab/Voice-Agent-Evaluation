@@ -184,7 +184,7 @@ The storefront address is set on the Configuration page and saved to `monitor_se
 
 ## Known limits
 
-- **Speech in the suite is text-level.** The 40-case suite models recognition errors as text, not audio. Real speech is tested only by the single front desk case.
+- **Speech in the suite is text-level.** The 74-case suite models recognition errors as text, not audio. Real speech is tested only by the single front desk case.
 - **The browser's voices are limited.** The monitor's laptop speaker uses the voices installed on the computer. Some computers have only two or three English voices.
 - **The store data is in memory and fictional.** Orders, catalogue and policy live in `data/catalog/northwind_outdoor.json`.
 - **One server process, one operator.** There are no user accounts. Storefront sessions and runs are kept per server.

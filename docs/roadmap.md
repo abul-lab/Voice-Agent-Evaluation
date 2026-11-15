@@ -7,7 +7,7 @@ Status key: **done**, **in progress**, **planned**, **blocked** (with the blocke
 
 ## Phase 1: measure conversations
 
-### 1.1 Conversation metrics (done, uncommitted)
+### 1.1 Conversation metrics (done, c68230d)
 Code: `src/voiceshop/evaluation/conversation_metrics.py`, tests in `tests/test_conversation_metrics.py`.
 Metrics computed from the run records: task completion, corrections, interruptions, latency, escalations.
 Definitions (operational, from transcript signals):
@@ -38,13 +38,13 @@ the report, mapped onto the existing failure categories.
 
 ## Phase 3: the three gaps
 
-### 3.1 Action confirmation policy (done, uncommitted)
+### 3.1 Action confirmation policy (done, 574350b)
 Built: the refund agent reads back the amount and order, then waits. Only a yes records the approval; a no records
 `refund.declined` and approves nothing; anything else asks again. Other routing is held while the read-back is
 open. A repeat refund for an order already approved is answered as a duplicate without a new question. New
 scenario `store_refund_declined_at_read_back` (in the full tier only, so the targeted tier stays at three) and checks
 `refund_confirmed_first` and `refund_declined_leaves_ledger_unchanged`. Tests: `tests/test_refund_confirmation.py`.
-Result: 72 of 72 cases pass in rules mode, regression gate PASS.
+Result when committed: 72 of 72 cases pass in rules mode, regression gate PASS. (Item 3.2 later brought the suite to 74.)
 
 Original definition:
 Refunds, and any money movement, are confirmed back to the caller before approval. Policy is data: which
@@ -52,7 +52,7 @@ actions need confirmation, and what must be read back (order number, amount, ref
 Acceptance: a refund is never approved without a yes after the read-back; a test shows a "no" or silence
 leaves the ledger unchanged; the existing refund checks still pass.
 
-### 3.2 Recovery flows (done, uncommitted)
+### 3.2 Recovery flows (done, 574350b)
 Built: a repair ladder in the router. The first unclear turn gets the specialist's own answer (or "Sorry about that.
 Could you tell me again?" when the caller says the agent got it wrong). The second lists what the agent can do.
 The third hands over with reason code REPAIR_LIMIT. Any understood turn resets the count. Unclear means no team
@@ -66,7 +66,7 @@ A repair ladder: ask again, then rephrase with options, then offer a human. Each
 Acceptance: a caller who is misunderstood three times is offered a handoff; the ladder is covered by
 scenarios in the suite; recovery turns are counted in the conversation metrics.
 
-### 3.3 Barge-in (partly done, uncommitted: decision and timing built; no audio channel yet)
+### 3.3 Barge-in (partly done, 56a3441: decision and timing built; no audio channel yet)
 Built: `src/voiceshop/speech/barge_in.py`. Given a reply being spoken and the time the caller starts, it decides
 whether the caller interrupts, when playback stops, and what the caller heard (the words said before the stop).
 Off by default (`VOICESHOP_BARGE_IN`, shown by `check-config`). Interruption metrics become measurable when a
@@ -83,13 +83,13 @@ interruption metric becomes measurable.
 
 ## Security and privacy (small items, do early)
 
-### S.1 Stop reading card digits aloud (done, uncommitted)
+### S.1 Stop reading card digits aloud (done, 328e209)
 Code: `src/voiceshop/privacy.py` (Luhn-checked detection and masking), applied to stored transcripts in
 `RunRepository.append_turn`. Tests: `tests/test_card_privacy.py`. Agent replies only ever give the last four digits.
 Payment references are not spoken back in full; use the last four digits only, or a token.
 Acceptance: no spoken text contains a full card-like number (test over all scenarios).
 
-### S.2 Sign-in for reads (done, uncommitted)
+### S.2 Sign-in for reads (done, 7a40fc8)
 Built: `GET /api/runs*` (runs, turns, stream, audit) need a valid key (any role). The live stream uses a single-use
 ticket from `POST /api/stream-tickets`, valid 60 seconds. The storefront stays open. The monitor and history pages
 send the key from the browser tab's session storage. Local loopback exception unchanged. Tests:

@@ -80,6 +80,12 @@ Code: `src/voiceshop/privacy.py` (Luhn-checked detection and masking), applied t
 Payment references are not spoken back in full; use the last four digits only, or a token.
 Acceptance: no spoken text contains a full card-like number (test over all scenarios).
 
-### S.2 Sign-in for reads
+### S.2 Sign-in for reads (done, uncommitted)
+Built: `GET /api/runs*` (runs, turns, stream, audit) need a valid key (any role). The live stream uses a single-use
+ticket from `POST /api/stream-tickets`, valid 60 seconds. The storefront stays open. The monitor and history pages
+send the key from the browser tab's session storage. Local loopback exception unchanged. Tests:
+`tests/test_read_access.py`.
+
+Original definition:
 Transcripts and the audit trail require a key. The storefront stays open.
 Acceptance: unauthenticated requests to transcript and audit reads return 401; existing e2e checks updated.

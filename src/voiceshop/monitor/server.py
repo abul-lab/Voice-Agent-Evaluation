@@ -30,7 +30,7 @@ from voiceshop import __version__
 from voiceshop.context import RuntimeContext
 from voiceshop.errors import VoiceShopError
 from voiceshop.monitor.admin import AdminRoutes
-from voiceshop.monitor.auth import KeyRing, Principal
+from voiceshop.monitor.auth import KeyRing, Principal, TicketStore
 from voiceshop.monitor.ratelimit import TokenBucket
 from voiceshop.monitor.runs import RunRoutes
 from voiceshop.monitor.security import SECURITY_HEADERS
@@ -150,6 +150,7 @@ class MonitorApp:
         self.store_bundle = store_bundle
         self.local_ui_no_key = local_ui_no_key
         self.keys = keys if keys is not None else KeyRing.single(api_key)
+        self.tickets = TicketStore()  # single-use tickets for live streams (see auth.TicketStore)
         self.api_key = api_key  # kept for callers that still pass one shared key
         self.max_body = max_body_bytes
         self.metrics = Metrics()
@@ -283,6 +284,11 @@ class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path, query = parsed.path.rstrip("/") or "/", parse_qs(parsed.query)
         try:
+            if path == "/api/runs" or path.startswith("/api/runs/"):
+                # Transcripts and the audit trail are personal data: a valid key is required to read them.
+                ticket = (query.get("ticket") or [None])[0] if path.endswith("/stream") else None
+                if self._read_principal("/api/runs/{id}", ticket) is None:
+                    return
             static_routes = {
                 "/": ("index.html", "text/html; charset=utf-8"),
                 "/shop": ("shop.html", "text/html; charset=utf-8"),
@@ -372,6 +378,12 @@ class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
             return self._history_clear()
         if path == "/api/settings":
             return self._settings_save()
+        if path == "/api/stream-tickets":
+            principal = self._read_principal("/api/stream-tickets")
+            if principal is None:
+                return
+            return self._json(200, {"ticket": self.app.tickets.issue(principal), "expires_in_s": 60},
+                              "/api/stream-tickets")
         cancel = re.fullmatch(r"/api/batches/([A-Za-z0-9._-]{1,80})/cancel", path)
         if path == "/shop/api/action":
             return self._shop_action()
@@ -431,6 +443,29 @@ class _Handler(ShopRoutes, AdminRoutes, RunRoutes, BaseHTTPRequestHandler):
             return None
         if not self.app.limit_changes.allow(principal.name):
             self._error(429, "rate_limited", f"too many changes by {principal.name}; slow down", route)
+            return None
+        return principal
+
+    def _read_principal(self, route: str, ticket: str | None = None) -> Principal | None:
+        """Who may read run transcripts and audit records. Any valid key may read; the storefront stays open.
+        A stream ticket (from POST /api/stream-tickets) stands in for the header on EventSource streams."""
+        if not self.app.limit_attempts.allow(self._client_address()):
+            self._error(429, "rate_limited", "too many requests from this address; slow down", route)
+            return None
+        if self._local_ui_allowed():
+            return Principal("local-ui", "admin")
+        if ticket is not None:
+            principal = self.app.tickets.redeem(ticket)
+            if principal is None:
+                self._error(401, "unauthorised", "stream ticket is missing, used or expired", route)
+                return None
+            return principal
+        if self.app.keys.is_empty:
+            self._error(403, "api_disabled", "reading run records is disabled: no API key is configured", route)
+            return None
+        principal = self.app.keys.authenticate(self.headers.get("X-API-Key"))
+        if principal is None:
+            self._error(401, "unauthorised", "this page needs a valid API key", route)
             return None
         return principal
 

@@ -37,10 +37,19 @@
     return { passed: c.filter((x) => x.passed).length, total: c.length, list: c };
   };
 
+  // The API key is kept for this browser tab (set on the Monitor page). Run records need it.
   async function api(path, options = {}) {
-    const res = await fetch(path, { headers: { Accept: "application/json" }, ...options });
+    const headers = { Accept: "application/json", ...(options.headers || {}) };
+    let key = "";
+    try { key = sessionStorage.getItem("evs.apiKey") || ""; } catch (err) { key = ""; }
+    if (key) headers["X-API-Key"] = key;
+    const res = await fetch(path, { ...options, headers });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error ? `${body.error.code}: ${body.error.message}` : `HTTP ${res.status}`);
+    if (!res.ok) {
+      const note = res.status === 401 || res.status === 403
+        ? " Enter the API key on the Monitor page in this tab, then reload this page." : "";
+      throw new Error((body.error ? `${body.error.code}: ${body.error.message}` : `HTTP ${res.status}`) + note);
+    }
     return body;
   }
 

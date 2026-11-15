@@ -33,8 +33,22 @@
     return node;
   }
 
+  // The API key is needed to read run records (and to change anything). It is kept for this browser tab only.
+  const KEY_STORE = "evs.apiKey";
+  function apiKey() {
+    const typed = $("api-key") ? $("api-key").value.trim() : "";
+    if (typed) return typed;
+    try { return sessionStorage.getItem(KEY_STORE) || ""; } catch (err) { return ""; }
+  }
+  function rememberKey(key) {
+    try { if (key) sessionStorage.setItem(KEY_STORE, key); } catch (err) { /* storage can be blocked */ }
+  }
+
   async function api(path, options = {}) {
-    const res = await fetch(path, { headers: { Accept: "application/json" }, ...options });
+    const headers = { Accept: "application/json", ...(options.headers || {}) };
+    const key = apiKey();
+    if (key) headers["X-API-Key"] = key;
+    const res = await fetch(path, { ...options, headers });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = body && body.error ? `${body.error.code}: ${body.error.message}` : `HTTP ${res.status}`;
@@ -550,7 +564,17 @@
     }
 
     $("live-badge").classList.remove("hidden");
-    const stream = new EventSource(`/api/runs/${encodeURIComponent(id)}/stream`);
+    // EventSource cannot send the API key header, so the key is exchanged once for a single-use ticket.
+    let ticket;
+    try {
+      const issued = await api("/api/stream-tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      ticket = issued.ticket;
+    } catch (err) {
+      $("exec-line").textContent = `Enter the API key to watch this run (${err.message}).`;
+      return undefined;
+    }
+    if (epoch !== state.epoch) return undefined;
+    const stream = new EventSource(`/api/runs/${encodeURIComponent(id)}/stream?ticket=${encodeURIComponent(ticket)}`);
     state.stream = stream;
     let received = 0;
     // Events from a stream that is no longer the current one (closed by Stop, Reset or a new selection) are ignored.
@@ -613,6 +637,7 @@
       state.suiteNoticeShown = false;
       state.startedHere = true;
       state.key = key;
+      rememberKey(key);
       $("stop-run").disabled = false;
       state.userPicked = false;
       state.selected = null;

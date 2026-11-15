@@ -15,6 +15,8 @@ import hmac
 import json
 import re
 import secrets
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -106,3 +108,32 @@ def load_entries(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     return list(json.loads(path.read_text(encoding="utf-8")).get("keys", []))
+
+
+class TicketStore:
+    """Short-lived, single-use tickets for live streams. A browser's EventSource cannot send the API key
+    header, so the key is exchanged once for a ticket that opens one stream and then expires."""
+
+    def __init__(self, ttl_s: float = 60.0, clock=None) -> None:
+        self._ttl = ttl_s
+        self._clock = clock or time.monotonic
+        self._lock = threading.Lock()
+        self._tickets: dict[str, tuple[Principal, float]] = {}
+
+    def issue(self, principal: Principal) -> str:
+        token = secrets.token_urlsafe(24)
+        now = self._clock()
+        with self._lock:
+            self._tickets = {t: v for t, v in self._tickets.items() if v[1] > now}  # drop expired ones
+            self._tickets[token] = (principal, now + self._ttl)
+        return token
+
+    def redeem(self, token: str | None) -> Principal | None:
+        """Returns the principal once; a second use, or an expired ticket, returns None."""
+        if not token:
+            return None
+        with self._lock:
+            entry = self._tickets.pop(token, None)
+        if entry is None or entry[1] <= self._clock():
+            return None
+        return entry[0]

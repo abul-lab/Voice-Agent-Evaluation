@@ -7,7 +7,7 @@ Release gates for a multi-agent voice shopping assistant. The shop is fictional 
 - **A four-agent store.** A Front Desk Specialist routes each caller to one of four specialists: Shopping, Order Tracking, Refunds and Customer Care. Specialists act only through a tool gateway that enforces per-agent scopes and writes an audit trail.
 - **A storefront** at `/shop`, which the voice agents shop through. Voice and clicks share one cart.
 - **A live monitor** at `/`: the storefront inside a device, the conversation, the agent network, test runs and results.
-- **A test suite** of 71 scripted callers in three tiers (below), with 20 named checks. 31 of the cases are red-team attacks.
+- **A test suite** of 74 scripted callers in three tiers (below), with 23 named checks. 31 of the cases are red-team attacks.
 - **Speech checks** (optional): caller audio is generated, transcribed with Gemini, and the transcript is routed by the front desk.
 - **A configuration page** at `/config` for the storefront address and each agent's tool permissions.
 
@@ -26,7 +26,7 @@ Run the test tiers from the command line:
 ```bash
 voiceshop eval --tags smoke        # 1 case
 voiceshop eval --tags targeted     # 3 cases
-voiceshop eval                     # full regression, 71 cases
+voiceshop eval                     # full regression, 74 cases
 voiceshop regress                  # compare the last full run with the saved baseline
 voiceshop scenarios                # list the cases
 ```
@@ -52,7 +52,7 @@ ruff check src tests
 |---|---|---|
 | Smoke | 1 | The Front Desk Specialist hands a shopper to the Shopping Agent, who recommends a tent. Run on every change. |
 | Targeted regression | 3 | The Front Desk Specialist with each other agent: Shopping (winter bag, then price), Order Tracking (status after verification), Refunds (refund within the window). |
-| Full regression | 71 | Everything above, plus customer care and handoffs, storefront flows, guardrails, 31 red-team attacks (prompt injection, data extraction, impersonation, social engineering, policy bypass, abuse, off-topic), driving safety holds, and background noise (a passing car, rain). Run before a release. |
+| Full regression | 74 | Everything above, plus customer care and handoffs, storefront flows, guardrails, 31 red-team attacks (prompt injection, data extraction, impersonation, social engineering, policy bypass, abuse, off-topic), driving safety holds, and background noise (a passing car, rain). Run before a release. |
 
 Each case is a caller with a fixed goal and a fixed seed, so the same case gives the same conversation.
 
@@ -175,6 +175,7 @@ The storefront address is set on the Configuration page and saved to `monitor_se
 
 - No secrets are stored in the repository. Keys come only from environment variables, and `.env` files are ignored by git.
 - The server listens on loopback by default. Binding to another address requires an API key.
+- Transcripts, runs and the audit trail can be read only with a key (any role). The live stream uses a single-use ticket of 60 seconds, because a browser's EventSource cannot send the key header. The storefront stays open.
 - Changes through the API require the key unless the local, loopback-only exception is enabled. Request bodies have a size limit, and only JSON is accepted.
 - Static files are served from a fixed list. Identifiers in URLs are validated with a strict pattern.
 - The storefront may be framed only by this monitor (`X-Frame-Options` and CSP).
@@ -209,7 +210,7 @@ voiceshop keys revoke --name qe-analyst
 
 | Role | Can |
 |---|---|
-| viewer | read everything the monitor shows |
+| viewer | read transcripts, runs and the audit trail (with a key) |
 | operator | start and stop test suites |
 | admin | everything above, change settings, clear history |
 

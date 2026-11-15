@@ -16,7 +16,7 @@ from voiceshop.simulation.conversation import CustomerUtterance
 
 COMPLETE_ACTS = {
     "recommend", "out_of_stock", "no_match", "answer_price", "answer_stock", "compare",
-    "order_status", "refund_approved", "refund_refused", "escalate",
+    "order_status", "refund_approved", "refund_refused", "refund_declined", "escalate",
     # storefront goals
     "added_to_cart", "cart_summary", "cart_empty", "cannot_add", "order_placed", "order_cancelled",
     "interactive_mode", "resumed", "paused", "cannot_place",
@@ -24,8 +24,10 @@ COMPLETE_ACTS = {
     "care_info", "care_handoff", "care_logged",
     # safety and guardrails: the agent's refusal is the answer
     "safety_hold", "out_of_scope", "verify_failed",
+    # repair ladder: the caller is handed to a person
+    "recovery_handoff",
 }
-REPEAT_ACTS = {"greet", "ask_intent", "out_of_scope"}
+REPEAT_ACTS = {"greet", "ask_intent", "out_of_scope", "clarify", "offer_options"}
 GOALS = ("recommend", "price", "stock", "compare", "order", "refund",
          "add_to_cart", "cart", "checkout", "takeover", "resume", "care", "say")
 WRONG_EMAIL = "not.the.owner@example.com"
@@ -133,6 +135,9 @@ class ShopperSimulator:
         self._wrong_left = self.goal.wrong_emails
         nxt = self._opener(self.goal)
         # Keep the next request's own capitalisation ("I'm back" must not become "i'm back").
+        # "Thanks" reads as a goodbye to the router, so a free-text goal is said without it.
+        if self.goal.intent == "say":
+            return self._say(nxt.text, nxt.intent_label)
         return self._say("Thanks. " + nxt.text, nxt.intent_label)
 
     # ---------------------------------------------------------------- api
@@ -163,6 +168,8 @@ class ShopperSimulator:
             return self._say(f"It's {email}.", None)
         if act in ("verify_failed", "service_error"):
             return self._credentials(g)
+        if act == "confirm_refund":
+            return self._say("No, don't approve it." if g.decline else "Yes, approve the refund.", None)
         if act == "confirm_order":
             return self._say("No, not yet." if g.decline else "Yes, place the order.", None)
         if act == "ask_product":

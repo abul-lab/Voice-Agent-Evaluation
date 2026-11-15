@@ -271,6 +271,73 @@
       }
     },
     {
+      "id": "store_refund_declined_at_read_back",
+      "description": "The refund is read back and the caller says no: nothing is approved and the order is unchanged.",
+      "tags": [
+        "refund",
+        "policy"
+      ],
+      "seed": 36,
+      "today": "2026-11-16",
+      "max_turns": 12,
+      "goals": [
+        {
+          "intent": "refund",
+          "email": "maria.lopez@example.com",
+          "order_no": "NW-1001",
+          "decline": true
+        }
+      ],
+      "expect": {
+        "agent_path": [
+          "refund"
+        ],
+        "declined": true,
+        "forbidden_audit": [
+          "refund.approved"
+        ]
+      }
+    },
+    {
+      "id": "store_recovery_three_misses_hands_over",
+      "description": "Three unclear requests in a row: the agent asks again, offers the options, then hands over to a person.",
+      "tags": [
+        "recovery"
+      ],
+      "seed": 41,
+      "today": "2026-11-16",
+      "max_turns": 14,
+      "goals": [
+        {"intent": "say", "say_text": "purple monkey dishwasher"},
+        {"intent": "say", "say_text": "zorp flibbertigibbet"},
+        {"intent": "say", "say_text": "qwerty plonk"}
+      ],
+      "expect": {
+        "repair_ladder": true
+      }
+    },
+    {
+      "id": "store_recovery_resets_when_understood",
+      "description": "Two unclear requests separated by a clear one: the count restarts, so no handover happens.",
+      "tags": [
+        "recovery"
+      ],
+      "seed": 42,
+      "today": "2026-11-16",
+      "max_turns": 14,
+      "goals": [
+        {"intent": "say", "say_text": "purple monkey dishwasher"},
+        {"intent": "recommend", "category_text": "tent", "people": 2, "verbose": true},
+        {"intent": "say", "say_text": "zorp flibbertigibbet"},
+        {"intent": "say", "say_text": "qwerty plonk"}
+      ],
+      "expect": {
+        "forbidden_acts": [
+          "recovery_handoff"
+        ]
+      }
+    },
+    {
       "id": "store_refund_refused_window",
       "description": "Delivered 47 days ago: refused citing REFUND-WINDOW-30.",
       "tags": [

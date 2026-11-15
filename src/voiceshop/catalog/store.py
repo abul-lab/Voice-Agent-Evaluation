@@ -156,6 +156,15 @@ class ToolGateway:
         self.audit.record(self.tenant, agent, "refund.refused", order_no, rule_id=rule_id,
                           policy_version=policy_version)
 
+    def existing_refund(self, agent: str, order_id: str) -> dict[str, Any] | None:
+        """The approval already on record for this order, if any. Read without approving anything."""
+        self._authorise(agent, "issue_refund")
+        return self.ledger.get(self.tenant, order_id)
+
+    def record_decline(self, agent: str, order_id: str, amount: int) -> None:
+        """The caller said no to a refund the agent had read back. Nothing is approved."""
+        self.audit.record(self.tenant, agent, "refund.declined", order_id, amount=amount)
+
     # ------------------------------------------------------- storefront tools
     def _shop_call(self, agent: str, tool: str, sid: str, action: str, fn, **detail: Any) -> Any:
         """Every storefront change by an agent is scope-checked, applied atomically, and audited."""

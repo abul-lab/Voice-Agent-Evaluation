@@ -83,6 +83,8 @@ def test_verified_session_carries_across_refund_handoff(catalog, store, gateway)
     conductor.respond("It's maria.lopez@example.com.")
     assert conductor.session.verified == "NW-1001"
     reply = conductor.respond("Actually I'd like a refund.")
+    assert reply.agent == "refund" and reply.act == "confirm_refund"  # read back first
+    reply = conductor.respond("Yes, approve it.")
     assert reply.agent == "refund" and reply.act == "refund_approved"
 
 

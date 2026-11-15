@@ -37,6 +37,10 @@ REFUND_CUES = ("refund", "return", "money back", "send it back", "give me my mon
 CARE_COMPLAINT_CUES = ("complain", "complaint", "feedback", "unhappy", "rude", "not happy", "bad service")
 CARE_HUMAN_CUES = ("manager", "supervisor", "real person", "human", "speak to someone", "talk to someone",
                    "speak to a person", "talk to a person")
+# The caller says the agent got it wrong. Counted as a repair turn, never as a request.
+UNCLEAR_ACTS = {"out_of_scope", "no_match"}  # a specialist's answer that means "I did not follow that"
+MISUNDERSTOOD_CUES = ("that's not what i", "that is not what i", "i didn't say", "i did not say", "not what i asked",
+                      "you misunderstood", "you got that wrong", "that's wrong", "that is wrong")
 CARE_INFO_CUES = ("opening hours", "store hours", "open today", "phone number", "contact details", "contact you",
                   "how do i contact", "how can i contact", "your location", "email address")
 # Published store information the care agent may quote. Fictional brand, example contact details.
@@ -82,6 +86,10 @@ class Session:
     email: str | None = None
     verified: str | None = None
     failed: int = 0
+    # A refund read back to the caller, waiting for a yes or no. Nothing is approved until it is a yes.
+    pending_refund: dict[str, Any] | None = None
+    # Repair turns in a row: the router did not understand, or the caller corrected it. Reset by any understood turn.
+    misses: int = 0
 
 
 @dataclass
@@ -146,11 +154,15 @@ class FrontDeskRouter:
                 return self._reply("router", "close", {}, f"Thanks for shopping with {BRAND}. Drive safely!",
                                    u.intent, started, terminal=True)
             return self._reply("router", "safety_hold", {}, SAFETY_TEXT, u.intent, started)
-        target = self._route(utterance, f, u)
-        if self.classifier is not None and target != "close":
-            team = self.classifier.classify(utterance)  # raises on failure: the case is an error, not a fall-back
-            if team is not None:
-                target = team
+        if self.session.pending_refund is not None and u.intent != "goodbye":
+            # The refund agent is waiting for a yes or no: nothing else is routed until it has an answer.
+            target = "refund"
+        else:
+            target = self._route(utterance, f, u)
+            if self.classifier is not None and target != "close":
+                team = self.classifier.classify(utterance)  # raises on failure: the case is an error, not a fall-back
+                if team is not None:
+                    target = team
         t_routed = _clock.perf_counter()
         self._stage["route_ms"] = round((t_routed - t_understood) * 1000, 3)
 
@@ -158,12 +170,12 @@ class FrontDeskRouter:
             self.ended = True
             return self._reply("router", "close", {}, f"Thanks for shopping with {BRAND}. Have a great day!",
                                u.intent, started, terminal=True)
-        if target is None:
-            if u.intent == "greeting":
-                return self._reply("router", "ask_intent", {}, "Hi again. What can I help you with?", u.intent, started)
-            return self._reply("router", "out_of_scope", {},
-                               "I can help you find gear, shop your cart, track orders and handle refunds.",
-                               u.intent, started)
+        if target is None and u.intent == "greeting":
+            return self._reply("router", "ask_intent", {}, "Hi again. What can I help you with?", u.intent, started)
+        if target is None or _has(f, MISUNDERSTOOD_CUES):
+            # Repair ladder: ask again, then offer the options, then hand over to a person.
+            self.session.misses += 1
+            return self._repair(started, u.intent, corrected=target is not None)
 
         switched = target != self.active
         self.active = target
@@ -171,7 +183,33 @@ class FrontDeskRouter:
         act, params, body = self._dispatch(target, utterance, f, u)
         self._stage["dispatch_ms"] = round((_clock.perf_counter() - t_routed) * 1000, 3)
         text = f"I'll connect you with our {NAMES[target]}. {body}" if switched else body
+        if act in UNCLEAR_ACTS:
+            # The specialist did not understand either. First time: its own answer stands. Then climb the ladder.
+            self.session.misses += 1
+            if self.session.misses >= 2:
+                return self._repair(started, u.intent, corrected=False)
+        else:
+            self.session.misses = 0
         return self._reply(target, act, params, text, u.intent, started)
+
+    def _repair(self, started: float, intent: str | None, corrected: bool) -> StoreReply:
+        """One rung of the repair ladder. ``corrected`` means the caller said the agent got it wrong."""
+        n = self.session.misses
+        if n >= 3:
+            return self._reply("router", "recovery_handoff", {"code": "REPAIR_LIMIT"},
+                               "I'm sorry, I'm not getting this right. I'm transferring you to a member of our "
+                               "support team now. Reason code REPAIR_LIMIT.", intent, started)
+        if n == 2:
+            return self._reply("router", "offer_options", {},
+                               "Let me list what I can do: find and recommend gear, add to your cart and check out, "
+                               "track an order with its number and email, handle a refund, or talk to a person. "
+                               "Which would you like?", intent, started)
+        if corrected:
+            return self._reply("router", "clarify", {},
+                               "Sorry about that. Could you tell me again what you need?", intent, started)
+        return self._reply("router", "out_of_scope", {},
+                           "I can help you find gear, shop your cart, track orders and handle refunds.",
+                           intent, started)
 
     # ------------------------------------------------------------ routing
     def _capture(self, utterance: str) -> None:
@@ -180,6 +218,7 @@ class FrontDeskRouter:
             order_no = f"NW-{m.group(1)}"
             if self.session.verified and self.session.verified != order_no:
                 self.session.verified = None
+                self.session.pending_refund = None  # a refund read back for the old order no longer applies
             self.session.order_no = order_no
         e = EMAIL_RE.search(utterance)
         if e:
@@ -214,7 +253,7 @@ class FrontDeskRouter:
             return self._order()
         if target == "care":
             return self._care(f)
-        return self._refund()
+        return self._refund(f)
 
     # ------------------------------------------------------------ customer care
     def _care(self, f: str) -> tuple[str, dict[str, Any], str]:
@@ -361,7 +400,9 @@ class FrontDeskRouter:
             text = f"Order {order.id} is being prepared and is due on {_day(order.eta)}."
         return "order_status", {"order": order.id, "status": order.status}, text
 
-    def _refund(self) -> tuple[str, dict[str, Any], str]:
+    def _refund(self, f: str = "") -> tuple[str, dict[str, Any], str]:
+        if self.session.pending_refund is not None:
+            return self._confirm_refund(f)
         blocked = self._verify()
         if blocked:
             return blocked
@@ -381,6 +422,37 @@ class FrontDeskRouter:
             text = f"{reasons[decision.rule_id]} (rule {decision.rule_id}, policy {version})"
             return "refund_refused", {"order": order.id, "rule_id": decision.rule_id,
                                       "policy_version": version}, text
+        # A refund already on record is answered as a duplicate: there is nothing new to confirm.
+        if self.gateway.existing_refund("refund", order.id) is None:
+            # Approval needs the caller's yes after the read-back. Only then does the ledger record it.
+            self.session.pending_refund = {"order": order.id, "amount": order.total, "policy_version": version}
+            text = (f"Your refund of ${order.total} for order {order.id} will go back to your original payment "
+                    f"method within {self.store.policy['refund_timeline']}. Shall I approve it? "
+                    f"Please say yes or no.")
+            return "confirm_refund", {"order": order.id, "amount": order.total,
+                                      "policy_version": version}, text
+        return self._approve(order, version)
+
+    def _confirm_refund(self, f: str) -> tuple[str, dict[str, Any], str]:
+        """Answers the read-back: yes approves, no cancels, anything else asks again."""
+        pending = self.session.pending_refund or {}
+        order_id = pending.get("order", "")
+        if _is_no(f):
+            self.session.pending_refund = None
+            self.gateway.record_decline("refund", order_id, pending.get("amount", 0))
+            return ("refund_declined", {"order": order_id},
+                    f"No problem, I haven't approved the refund. Your order {order_id} is unchanged.")
+        if _is_yes(f):
+            order, err = self._load_verified("refund")
+            if err:
+                self.session.pending_refund = None
+                return err
+            self.session.pending_refund = None
+            return self._approve(order, pending.get("policy_version", self.store.policy["version"]))
+        return ("confirm_refund", {"order": order_id, "amount": pending.get("amount")},
+                "Please say yes to approve the refund, or no to cancel it.")
+
+    def _approve(self, order: Order, version: str) -> tuple[str, dict[str, Any], str]:
         try:
             record, duplicate = self.gateway.issue_refund("refund", order, order.total, version)
         except ToolFault:

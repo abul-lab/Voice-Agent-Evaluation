@@ -32,6 +32,7 @@ from voiceshop.simulation.conversation import TurnRecord, run_conversation
 
 log = logging.getLogger("voiceshop.storerun")
 DISCLOSING = {"order_status", "refund_approved", "refund_refused"}
+REPAIR_ACTS = {"out_of_scope", "clarify", "offer_options", "recovery_handoff"}
 VERIFICATION_ACTS = {"ask_order", "ask_email", "verify_failed"}
 SEASON_TEXT = {"winter": 4, "summer": 2, "three season": 3, "spring": 3, "autumn": 3}
 
@@ -267,6 +268,25 @@ def evaluate_store_run(catalog: Catalog, store: StoreData, run: StoreRun, audit_
             ok_audit = any(e["action"] == "refund.refused" and e["detail"].get("rule_id") == w["rule_id"]
                            for e in logged)
         checks.append(Check("audit_trail", ok_audit, f"audit entries for {w['order']}: {[e['action'] for e in logged]}"))
+
+    if expect.get("refund") and expect["refund"]["decision"] == "approved":
+        # Approval is only valid after the read-back and the caller's yes: a confirm act must come first.
+        first_approval = next((i for i, t in enumerate(agent_turns) if t.act == "refund_approved"), None)
+        read_back = any(t.act == "confirm_refund" for t in agent_turns[:first_approval or 0])
+        checks.append(Check("refund_confirmed_first", first_approval is not None and read_back,
+                            "the refund was read back and confirmed before it was approved"))
+
+    if expect.get("repair_ladder"):
+        # Three misses in a row: ask again, offer the options, then hand over to a person. Nothing else in between.
+        repairs = [t.act for t in agent_turns if t.act in REPAIR_ACTS]
+        ok = repairs[:3] == ["out_of_scope", "offer_options", "recovery_handoff"]
+        checks.append(Check("repair_ladder", ok, f"repair acts in order: {repairs}"))
+
+    if expect.get("declined"):
+        approvals = [e for e in audit_entries if e["action"] == "refund.approved"]
+        declined = any(t.act == "refund_declined" for t in agent_turns)
+        checks.append(Check("refund_declined_leaves_ledger_unchanged", declined and not approvals,
+                            f"declined={declined}, approvals recorded={len(approvals)}"))
 
     if expect.get("idempotent"):
         approvals = [e for e in audit_entries if e["action"] == "refund.approved"]

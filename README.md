@@ -26,7 +26,7 @@ Read the [case study](docs/case-study.md) for the design decisions and what fail
 - **A four-agent store.** A Front Desk Specialist routes each caller to one of four specialists: Shopping, Order Tracking, Refunds and Customer Care. Specialists act only through a tool gateway that enforces per-agent scopes and writes an audit trail.
 - **A storefront** at `/shop`, which the voice agents shop through. Voice and clicks share one cart.
 - **A live monitor** at `/`: the storefront inside a device, the conversation, the agent network, test runs and results.
-- **A test suite** of 74 scripted callers in three tiers (below), with 23 named checks. 31 of the cases are red-team attacks.
+- **A test suite** of 74 scripted callers in three tiers (below), with 23 named checks. 31 of the cases are red-team attacks. A separate barge-in test type (12 cases) interrupts the agents' replies.
 - **Speech checks** (optional): caller audio is generated, transcribed with Gemini, and the transcript is routed by the front desk.
 - **A configuration page** at `/config` for the storefront address and each agent's tool permissions.
 
@@ -72,6 +72,7 @@ ruff check src tests
 | Smoke | 1 | The Front Desk Specialist hands a shopper to the Shopping Agent, who recommends a tent. Run on every change. |
 | Targeted regression | 3 | The Front Desk Specialist with each other agent: Shopping (winter bag, then price), Order Tracking (status after verification), Refunds (refund within the window). |
 | Full regression | 74 | Everything above, plus customer care and handoffs, storefront flows, guardrails, 31 red-team attacks (prompt injection, data extraction, impersonation, social engineering, policy bypass, abuse, off-topic), driving safety holds, and background noise (a passing car, rain). Run before a release. |
+| Barge-in | 12 | A caller interrupts the agent's reply at a set point, with real caller clips (synthetic speech) and the stop decision measured on the audio timeline. Checks: the agent stops for a real interruption and not for a backchannel, and it answers what was said. Run on request from the Barge-in test type; not part of Full regression. |
 
 Each case is a caller with a fixed goal and a fixed seed, so the same case gives the same conversation.
 

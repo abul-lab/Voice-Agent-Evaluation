@@ -41,7 +41,7 @@ PASS_THRESHOLD = 0.9  # share of fully passing cases needed for the gate
 
 log = logging.getLogger("voiceshop.monitor")
 
-_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
+_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{8,64}\Z")  # \Z: no trailing newline allowed
 _SID = re.compile(r"[A-Za-z0-9._-]{1,120}\Z")  # \Z: no trailing newline allowed
 _PAGE = re.compile(r"(home|cart|checkout|category:[a-z_]{1,40}|product:[a-z0-9-]{1,40})\Z")
 _RUN_ID = re.compile(r"^[A-Za-z0-9._-]{1,120}$")

@@ -37,17 +37,19 @@
     return { passed: c.filter((x) => x.passed).length, total: c.length, list: c };
   };
 
-  // The API key is kept for this browser tab (set on the Monitor page). Run records need it.
+  // The API key is typed into this page when the server asks for it. It is held in memory only.
+  let memoryKey = "";
   async function api(path, options = {}) {
     const headers = { Accept: "application/json", ...(options.headers || {}) };
-    let key = "";
-    try { key = sessionStorage.getItem("evs.apiKey") || ""; } catch (err) { key = ""; }
-    if (key) headers["X-API-Key"] = key;
+    const typed = $("api-key") ? $("api-key").value.trim() : "";
+    if (typed) memoryKey = typed;
+    if (memoryKey) headers["X-API-Key"] = memoryKey;
     const res = await fetch(path, { ...options, headers });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const note = res.status === 401 || res.status === 403
-        ? " Enter the API key on the Monitor page in this tab, then reload this page." : "";
+      const needsKey = res.status === 401 || res.status === 403;
+      if (needsKey && $("key-field")) $("key-field").classList.remove("hidden");
+      const note = needsKey ? " Enter the API key above, then press Refresh." : "";
       throw new Error((body.error ? `${body.error.code}: ${body.error.message}` : `HTTP ${res.status}`) + note);
     }
     return body;

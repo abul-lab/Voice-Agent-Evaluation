@@ -33,15 +33,16 @@
     return node;
   }
 
-  // The API key is needed to read run records (and to change anything). It is kept for this browser tab only.
-  const KEY_STORE = "evs.apiKey";
+  // The API key is needed to read run records (and to change anything). It is held in this page's memory only:
+  // it is not written to browser storage, so a reload asks for it again.
+  let memoryKey = "";
   function apiKey() {
     const typed = $("api-key") ? $("api-key").value.trim() : "";
     if (typed) return typed;
-    try { return sessionStorage.getItem(KEY_STORE) || ""; } catch (err) { return ""; }
+    return memoryKey;
   }
   function rememberKey(key) {
-    try { if (key) sessionStorage.setItem(KEY_STORE, key); } catch (err) { /* storage can be blocked */ }
+    if (key) memoryKey = key;
   }
 
   async function api(path, options = {}) {

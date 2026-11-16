@@ -88,7 +88,7 @@ Acceptance: no spoken text contains a full card-like number (test over all scena
 ### S.2 Sign-in for reads (done, 7a40fc8)
 Built: `GET /api/runs*` (runs, turns, stream, audit) need a valid key (any role). The live stream uses a single-use
 ticket from `POST /api/stream-tickets`, valid 60 seconds. The storefront stays open. The monitor and history pages
-send the key from the browser tab's session storage. Local loopback exception unchanged. Tests:
+hold the key in page memory only (not in browser storage), so a reload asks for it again. Local loopback exception unchanged. Tests:
 `tests/test_read_access.py`.
 
 Original definition:

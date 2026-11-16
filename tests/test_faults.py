@@ -16,7 +16,7 @@ from voiceshop.speech.gemini import SpeechError
 from voiceshop.storage import db as dbmod
 from voiceshop.storage.repository import AuditLog, RefundLedger, RunRepository
 
-DATA = Path(__file__).resolve().parents[1] / "data" / "catalog" / "northwind_outdoor.json"
+DATA = Path(__file__).resolve().parents[1] / "data" / "catalog" / "outdoor_store.json"
 
 
 def test_a_failed_migration_is_rolled_back_and_the_version_is_unchanged(tmp_path, monkeypatch):

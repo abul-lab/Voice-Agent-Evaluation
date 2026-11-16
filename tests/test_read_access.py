@@ -35,7 +35,7 @@ def _bundle():
     from voiceshop.catalog.shop import ShopSessions
     from voiceshop.catalog.store import StoreData
 
-    data = Path(__file__).resolve().parents[1] / "data" / "catalog" / "northwind_outdoor.json"
+    data = Path(__file__).resolve().parents[1] / "data" / "catalog" / "outdoor_store.json"
     return {"catalog": Catalog.load(data), "store": StoreData(data), "scenarios": [], "shops": ShopSessions()}
 
 

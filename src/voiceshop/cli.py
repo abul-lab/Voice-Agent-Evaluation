@@ -27,7 +27,7 @@ from voiceshop.monitor.server import MonitorApp, make_server
 
 log = logging.getLogger("voiceshop.cli")
 ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA_PATH = ROOT / "data" / "catalog" / "outdoor_store.json"
 SCENARIOS_PATH = ROOT / "scenarios" / "store_scenarios.json"
 PASS_THRESHOLD = 0.9  # share of fully passing cases needed for the gate; the director sets the real value
 

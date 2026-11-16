@@ -10,7 +10,7 @@ from voiceshop.privacy import CARD_REMOVED, find_card_numbers, mask_card_numbers
 from voiceshop.simulation.conversation import TurnRecord
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA = ROOT / "data" / "catalog" / "outdoor_store.json"
 TEST_PAN = "4111 1111 1111 1111"  # a published test number that passes the Luhn check
 
 

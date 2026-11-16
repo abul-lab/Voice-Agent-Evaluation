@@ -27,7 +27,7 @@ from voiceshop.simulation.asr import word_error_rate
 from voiceshop.speech.gemini import GeminiSpeech, SpeechError, api_key_from_env
 
 ROOT = Path(__file__).resolve().parents[3]
-DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA = ROOT / "data" / "catalog" / "outdoor_store.json"
 OUT = ROOT / "results" / "speech" / "frontdesk_case"
 TODAY = date(2026, 11, 16)
 CALLER_LINE = "Hello, I would like a refund for my tent, please."

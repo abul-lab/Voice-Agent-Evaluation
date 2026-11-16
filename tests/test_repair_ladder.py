@@ -10,7 +10,7 @@ from voiceshop.catalog.store import StoreData, ToolGateway
 from voiceshop.storage.repository import AuditLog, RefundLedger
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA = ROOT / "data" / "catalog" / "outdoor_store.json"
 
 
 def _router(ctx, sid="repair"):

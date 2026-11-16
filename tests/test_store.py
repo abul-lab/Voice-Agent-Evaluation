@@ -11,7 +11,7 @@ from voiceshop.catalog.store import SCOPES, StoreData, ToolDenied, ToolGateway
 from voiceshop.storage.repository import AuditLog, RefundLedger
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA = ROOT / "data" / "catalog" / "outdoor_store.json"
 TODAY = date(2026, 11, 16)
 
 

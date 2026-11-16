@@ -23,7 +23,7 @@ from voiceshop.evaluation.judge import (
 )
 from voiceshop.evaluation.regression import compare, make_baseline
 
-DATA = Path(__file__).resolve().parents[1] / "data" / "catalog" / "northwind_outdoor.json"
+DATA = Path(__file__).resolve().parents[1] / "data" / "catalog" / "outdoor_store.json"
 
 
 def _run(sid, passed, tags=(), checks=(), turns=4, latency=(10.0,), conversation=()):

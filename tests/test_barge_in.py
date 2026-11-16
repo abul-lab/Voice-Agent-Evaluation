@@ -13,7 +13,7 @@ from voiceshop.speech.barge_in import STOP_BUDGET_MS, BargeIn, Playback
 from voiceshop.storage.repository import AuditLog, RefundLedger
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA = ROOT / "data" / "catalog" / "outdoor_store.json"
 REPLY = "Our four-person tent weighs 2.1 kilograms and sleeps four comfortably in the valley."
 
 

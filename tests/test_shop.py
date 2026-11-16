@@ -16,7 +16,7 @@ from voiceshop.catalog.storerun import load_store_scenarios
 from voiceshop.monitor.server import MonitorApp, make_server
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "catalog" / "northwind_outdoor.json"
+DATA = ROOT / "data" / "catalog" / "outdoor_store.json"
 
 
 @pytest.fixture

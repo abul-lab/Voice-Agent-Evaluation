@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/abul-lab/Voice-Agent-Evaluation/actions/workflows/ci.yml/badge.svg)](https://github.com/abul-lab/Voice-Agent-Evaluation/actions/workflows/ci.yml)
 
-**A quality process for a multi-agent voice shopping assistant.** Scripted callers exercise four specialist agents. Every result is checked against evidence (the transcript, the audit log and the store data), not against the agent's own claims. A release gate decides whether a version can ship. It is built with the Python standard library, has 179 tests, and runs 74 test cases in about a minute.
+**A quality process for a multi-agent voice shopping assistant.** Scripted callers exercise four specialist agents. Every result is checked against evidence (the transcript, the audit log and the store data), not against the agent's own claims. A release gate decides whether a version can ship. It is built with the Python standard library, has 189 tests, and runs 74 test cases in about a minute.
 
 ![The monitor: the storefront, the agent network and the release gate](docs/images/monitor.png)
 

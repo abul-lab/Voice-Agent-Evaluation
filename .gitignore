@@ -17,6 +17,7 @@ __pycache__/
 # local secrets and environment files: never commit keys
 .env
 .env.*
+!.env.example
 *.key
 
 # end-to-end test dependencies and browser cache
